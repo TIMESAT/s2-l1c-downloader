@@ -17,7 +17,7 @@ sentinel:
   # in every effective configuration and run manifest.
   end_date: null
   platform: null
-  tile_id: null
+  tile_id: "T33UVB"
   # Deliberately disabled by default. Tile cloud percentage is not a reliable
   # proxy for cloud over a small lake.
   max_scene_cloud_cover: null
@@ -48,4 +48,3 @@ catalogue:
 
 provenance:
   directory: "data/logs/runs"
-
