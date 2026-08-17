@@ -1,0 +1,51 @@
+project:
+  # All relative paths below are resolved from this root. This value is
+  # resolved relative to the directory containing this YAML file.
+  root: ".."
+
+study_area:
+  name: "Vombsjön"
+  geometry: "config/vombsjon.geojson"
+  search_feature: "vombsjon-search"
+  processing_roi_feature: "vombsjon-processing-roi-5km"
+
+sentinel:
+  collection: "sentinel-2-l1c"
+  processing_level: "L1C"
+  start_date: "2017-01-01"
+  # null means the current UTC date at run time; the resolved date is recorded
+  # in every effective configuration and run manifest.
+  end_date: null
+  platform: null
+  tile_id: null
+  # Deliberately disabled by default. Tile cloud percentage is not a reliable
+  # proxy for cloud over a small lake.
+  max_scene_cloud_cover: null
+
+api:
+  stac_search_url: "https://stac.dataspace.copernicus.eu/v1/search"
+  token_url: "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
+  download_base_url: "https://download.dataspace.copernicus.eu/odata/v1"
+  request_timeout_seconds: 120
+  page_size: 100
+
+download:
+  directory: "data/raw/S2_L1C"
+  layout: "tile/year"
+  workers: 2
+  retries: 5
+  backoff_seconds: 2.0
+  chunk_size_mib: 8
+  verify_checksum: true
+  keep_source_archive: true
+
+catalogue:
+  directory: "data/catalogue"
+  csv_name: "catalogue.csv"
+  parquet_name: "catalogue.parquet"
+  stac_name: "catalogue.stac.json"
+  write_parquet: true
+
+provenance:
+  directory: "data/logs/runs"
+

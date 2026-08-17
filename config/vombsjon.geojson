@@ -1,0 +1,61 @@
+{
+  "type": "FeatureCollection",
+  "name": "Vombsjon study geometries",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "vombsjon-search",
+      "properties": {
+        "name": "Vombsjön search geometry",
+        "role": "search",
+        "description": "Compact, approximate lake-covering polygon for product discovery; WGS84 longitude/latitude."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [13.498, 55.690],
+          [13.512, 55.674],
+          [13.548, 55.665],
+          [13.591, 55.670],
+          [13.626, 55.688],
+          [13.633, 55.707],
+          [13.615, 55.724],
+          [13.573, 55.733],
+          [13.532, 55.728],
+          [13.505, 55.711],
+          [13.498, 55.690]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "vombsjon-processing-roi-5km",
+      "properties": {
+        "name": "Vombsjön downstream processing ROI",
+        "role": "processing-roi",
+        "buffer_km": 5,
+        "description": "Approximate lake-boundary plus 5 km context ROI for downstream processing; not used to crop downloads."
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [13.419, 55.681],
+          [13.435, 55.645],
+          [13.490, 55.623],
+          [13.570, 55.615],
+          [13.650, 55.625],
+          [13.705, 55.650],
+          [13.720, 55.690],
+          [13.715, 55.730],
+          [13.680, 55.765],
+          [13.600, 55.780],
+          [13.520, 55.775],
+          [13.455, 55.750],
+          [13.420, 55.720],
+          [13.419, 55.681]
+        ]]
+      }
+    }
+  ]
+}
+

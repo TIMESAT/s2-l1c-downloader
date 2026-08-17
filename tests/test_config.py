@@ -1,0 +1,31 @@
+from __future__ import annotations
+
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+from s2vomb.config import load_config
+from s2vomb.utils import ConfigError
+
+
+def test_example_configuration_resolves_open_end_date():
+    repository = Path(__file__).resolve().parents[1]
+    config = load_config(repository / "config/vombsjon.yaml", today=date(2026, 8, 17))
+
+    assert config.sentinel.start_date == date(2017, 1, 1)
+    assert config.sentinel.end_date == date(2026, 8, 17)
+    assert config.sentinel.end_date_was_open is True
+    assert config.sentinel.max_scene_cloud_cover is None
+    assert config.download.workers == 2
+    assert config.study_area.geometry == repository / "config/vombsjon.geojson"
+
+
+def test_invalid_cloud_threshold_is_rejected(app_config):
+    text = app_config.source_path.read_text(encoding="utf-8")
+    app_config.source_path.write_text(
+        text.replace("max_scene_cloud_cover: null", "max_scene_cloud_cover: 101"),
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="between 0 and 100"):
+        load_config(app_config.source_path)

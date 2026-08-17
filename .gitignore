@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+
+# Local credentials and editor/OS files
+.env
+.env.*
+!.env.example
+.DS_Store
+.idea/
+.vscode/
+
+# Sentinel source products and partial transfers (never commit)
+data/raw/**
+!data/raw/.gitkeep
+*.SAFE/
+*.SAFE.zip
+*.part
+
+# Generated catalogues, reports, provenance, and logs
+data/catalogue/**
+!data/catalogue/.gitkeep
+data/logs/**
+!data/logs/.gitkeep
+
