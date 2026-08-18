@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from s2vomb.catalogue import CatalogueStore
 from s2vomb.download import (
     download_products,
@@ -96,6 +98,26 @@ def test_extracted_safe_detection_skips_authentication(app_config, zipped_record
     assert saved.checksum_verified is False
     assert verify_safe_directory(safe).valid
     assert not product_target(app_config, record).exists()
+
+
+def test_tile_layout_omits_year_and_recognizes_legacy_archive(app_config, zipped_record):
+    record, payload = zipped_record
+    tile_config = replace(app_config, download=replace(app_config.download, layout="tile"))
+    target = product_target(tile_config, record)
+    assert target.parent == tile_config.download.directory / record.tile_id
+
+    legacy = target.parent / str(record.year) / target.name
+    legacy.parent.mkdir(parents=True)
+    legacy.write_bytes(payload)
+    store = CatalogueStore(tile_config)
+    store.write_csv([record])
+
+    result = download_products(tile_config, [record], store, token_manager=NoAuth())
+
+    assert result.already_present == 1
+    assert result.downloaded == 0
+    assert store.read()[0].local_path == str(legacy)
+    assert not target.exists()
 
 
 def test_resumes_partial_download_and_checkpoints_catalogue(app_config, zipped_record):

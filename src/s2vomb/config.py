@@ -288,8 +288,8 @@ def load_config(path: str | Path, *, today: date | None = None) -> AppConfig:
 
     download = _mapping(root_data.get("download"), "download")
     layout = _required_text(download, "layout", "download")
-    if layout not in {"tile/year", "year"}:
-        raise ConfigError("download.layout must be 'tile/year' or 'year'")
+    if layout not in {"tile/year", "tile", "year"}:
+        raise ConfigError("download.layout must be 'tile/year', 'tile', or 'year'")
     try:
         backoff = float(download.get("backoff_seconds", 2.0))
     except (TypeError, ValueError) as error:

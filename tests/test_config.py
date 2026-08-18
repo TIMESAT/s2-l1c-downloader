@@ -18,6 +18,7 @@ def test_example_configuration_resolves_open_end_date():
     assert config.sentinel.end_date_was_open is True
     assert config.sentinel.max_scene_cloud_cover is None
     assert config.download.workers == 2
+    assert config.download.layout == "tile"
     assert config.study_area.geometry == repository / "config/vombsjon.geojson"
 
 

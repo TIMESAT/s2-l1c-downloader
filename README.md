@@ -206,7 +206,7 @@ directories are left untouched and do not suppress a download.
 
 ```text
 data/
-├── raw/S2_L1C/<tile>/<YYYY>/<original-product-name>.SAFE.zip
+├── raw/S2_L1C/<tile>/<original-product-name>.SAFE.zip
 ├── catalogue/
 │   ├── catalogue.csv
 │   ├── catalogue.parquet
@@ -222,6 +222,9 @@ data/
 
 `data/raw/**`, generated catalogues, and logs are ignored by Git. Product names and the complete
 archive content are preserved. Archives are not silently unpacked, cropped, converted, or deleted.
+The example uses `download.layout: tile`, so products are not divided into year directories. When
+this layout is selected, the downloader also recognizes complete products in the former
+`<tile>/<YYYY>/` layout and skips them without moving or deleting them.
 
 ## Reproducibility and provenance
 

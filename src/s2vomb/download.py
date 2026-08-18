@@ -66,12 +66,24 @@ class DownloadBatchResult:
 def product_target(config: AppConfig, record: ProductRecord) -> Path:
     filename = safe_product_filename(record.product_name)
     year = str(record.year)
-    if config.download.layout == "tile/year":
+    if config.download.layout in {"tile/year", "tile"}:
         tile = record.tile_id or "unknown-tile"
         if not re.fullmatch(r"T[0-9]{2}[A-Z]{3}|unknown-tile", tile):
             raise DownloadError(f"Unsafe or invalid tile ID in catalogue: {tile!r}")
-        return config.download.directory / tile / year / filename
+        directory = config.download.directory / tile
+        if config.download.layout == "tile/year":
+            directory /= year
+        return directory / filename
     return config.download.directory / year / filename
+
+
+def product_archive_candidates(config: AppConfig, record: ProductRecord) -> tuple[Path, ...]:
+    """Return the configured archive path plus compatible legacy locations."""
+    target = product_target(config, record)
+    if config.download.layout != "tile":
+        return (target,)
+    legacy = target.parent / str(record.year) / target.name
+    return (target, legacy)
 
 
 def product_safe_directory(config: AppConfig, record: ProductRecord) -> Path:
@@ -402,58 +414,68 @@ def download_products(
     pending: list[ProductRecord] = []
     for record in records:
         target = product_target(config, record)
-        if target.is_file():
-            verification = verify_local_file(
-                target, record, verify_checksum=config.download.verify_checksum
-            )
-            if verification.valid:
+        found_existing = False
+        archive_candidates = product_archive_candidates(config, record)
+        for existing_archive in archive_candidates:
+            if existing_archive.is_file():
+                verification = verify_local_file(
+                    existing_archive, record, verify_checksum=config.download.verify_checksum
+                )
+                if verification.valid:
+                    outcome = DownloadOutcome(
+                        record.product_id,
+                        "already-present",
+                        existing_archive,
+                        verification.size,
+                        verification.checksum_verified,
+                        0,
+                    )
+                    record.download_status = "completed"
+                    record.local_path = str(existing_archive)
+                    record.downloaded_bytes = verification.size
+                    record.checksum_verified = verification.checksum_verified
+                    record.last_error = ""
+                    outcomes.append(outcome)
+                    log.info("Already complete: %s", record.product_name)
+                    found_existing = True
+                    break
+                quarantine = _quarantine_invalid(existing_archive)
+                log.warning(
+                    "Moved invalid existing archive to %s (%s)",
+                    quarantine,
+                    verification.reason,
+                )
+        if found_existing:
+            continue
+        for archive_candidate in archive_candidates:
+            safe_directory = archive_candidate.with_suffix("")
+            safe_verification = verify_safe_directory(safe_directory)
+            if safe_verification.valid:
                 outcome = DownloadOutcome(
                     record.product_id,
                     "already-present",
-                    target,
-                    verification.size,
-                    verification.checksum_verified,
+                    safe_directory,
+                    safe_verification.size,
+                    False,
                     0,
                 )
-                record.download_status = "completed"
-                record.local_path = str(target)
-                record.downloaded_bytes = verification.size
-                record.checksum_verified = verification.checksum_verified
+                record.download_status = "existing-safe"
+                record.local_path = str(safe_directory)
+                record.downloaded_bytes = safe_verification.size
+                record.checksum_verified = False
                 record.last_error = ""
                 outcomes.append(outcome)
-                log.info("Already complete: %s", record.product_name)
-                continue
-            quarantine = _quarantine_invalid(target)
-            log.warning(
-                "Moved invalid existing archive to %s (%s)",
-                quarantine,
-                verification.reason,
-            )
-        safe_directory = product_safe_directory(config, record)
-        safe_verification = verify_safe_directory(safe_directory)
-        if safe_verification.valid:
-            outcome = DownloadOutcome(
-                record.product_id,
-                "already-present",
-                safe_directory,
-                safe_verification.size,
-                False,
-                0,
-            )
-            record.download_status = "existing-safe"
-            record.local_path = str(safe_directory)
-            record.downloaded_bytes = safe_verification.size
-            record.checksum_verified = False
-            record.last_error = ""
-            outcomes.append(outcome)
-            log.info("Already extracted SAFE: %s", record.product_name)
+                log.info("Already extracted SAFE: %s", record.product_name)
+                found_existing = True
+                break
+            if safe_directory.exists():
+                log.warning(
+                    "Ignoring incomplete extracted SAFE %s (%s)",
+                    safe_directory,
+                    safe_verification.reason,
+                )
+        if found_existing:
             continue
-        if safe_directory.exists():
-            log.warning(
-                "Ignoring incomplete extracted SAFE %s (%s)",
-                safe_directory,
-                safe_verification.reason,
-            )
         partial = target.with_name(f"{target.name}.part")
         if partial.is_file():
             verification = verify_local_file(

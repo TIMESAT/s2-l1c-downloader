@@ -33,7 +33,9 @@ api:
 
 download:
   directory: "data/raw/S2_L1C"
-  layout: "tile/year"
+  # Store all products for a tile together. The downloader also recognizes
+  # existing files in the former <tile>/<year>/ layout to prevent duplicates.
+  layout: "tile"
   workers: 2
   retries: 5
   backoff_seconds: 2.0
