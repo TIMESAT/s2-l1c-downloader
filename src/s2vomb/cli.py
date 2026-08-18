@@ -7,6 +7,7 @@ import csv
 import io
 import sys
 from collections.abc import Sequence
+from datetime import date
 from pathlib import Path
 
 from . import __version__
@@ -18,6 +19,7 @@ from .inventory import calculate_inventory, render_inventory, write_inventory
 from .models import (
     CATALOGUE_FIELDS,
     ProductRecord,
+    filter_records_by_date,
     filter_records_by_year,
     select_one_per_year_near_cloud,
 )
@@ -51,6 +53,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     _common_arguments(download)
     download.add_argument("--year", type=_year, help="download one acquisition year")
+    download.add_argument(
+        "--start-date", type=_iso_date, help="inclusive acquisition start date (YYYY-MM-DD)"
+    )
+    download.add_argument(
+        "--end-date", type=_iso_date, help="inclusive acquisition end date (YYYY-MM-DD)"
+    )
     download.add_argument(
         "--dry-run",
         action="store_true",
@@ -92,6 +100,13 @@ def _cloud_cover(value: str) -> float:
     if not 0 <= parsed <= 100:
         raise argparse.ArgumentTypeError("must be between 0 and 100")
     return parsed
+
+
+def _iso_date(value: str) -> date:
+    try:
+        return date.fromisoformat(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must use YYYY-MM-DD") from error
 
 
 def _load_geometries(config: AppConfig) -> tuple[GeometrySelection, GeometrySelection]:
@@ -232,16 +247,28 @@ def _download(args: argparse.Namespace, config: AppConfig, context: RunContext) 
     logger = configure_logging(context, verbose=args.verbose)
     store = CatalogueStore(config)
     records = filter_records_by_year(store.read(), args.year)
+    records = filter_records_by_date(records, args.start_date, args.end_date)
     if args.one_per_year_near_cloud is not None:
         records = select_one_per_year_near_cloud(records, args.one_per_year_near_cloud)
     inventory = calculate_inventory(records)
-    print(render_inventory(config, inventory, heading="Download selection", year=args.year))
+    print(
+        render_inventory(
+            config,
+            inventory,
+            heading="Download selection",
+            year=args.year,
+            start_date=args.start_date,
+            end_date=args.end_date,
+        )
+    )
     if not records:
         print("No catalogue records match the requested filters.")
         context.finish(
             status="completed",
             filters={
                 "year": args.year,
+                "start_date": args.start_date.isoformat() if args.start_date else None,
+                "end_date": args.end_date.isoformat() if args.end_date else None,
                 "one_per_year_near_cloud": args.one_per_year_near_cloud,
             },
             download={"selected": 0},
@@ -253,6 +280,8 @@ def _download(args: argparse.Namespace, config: AppConfig, context: RunContext) 
             status="cancelled",
             filters={
                 "year": args.year,
+                "start_date": args.start_date.isoformat() if args.start_date else None,
+                "end_date": args.end_date.isoformat() if args.end_date else None,
                 "one_per_year_near_cloud": args.one_per_year_near_cloud,
             },
             download={"selected": 0},
@@ -277,6 +306,8 @@ def _download(args: argparse.Namespace, config: AppConfig, context: RunContext) 
         status="completed" if result.failed == 0 else "completed-with-failures",
         filters={
             "year": args.year,
+            "start_date": args.start_date.isoformat() if args.start_date else None,
+            "end_date": args.end_date.isoformat() if args.end_date else None,
             "one_per_year_near_cloud": args.one_per_year_near_cloud,
         },
         download={

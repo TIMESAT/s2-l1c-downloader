@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import date
 
 from conftest import make_stac_item
 
@@ -8,6 +9,7 @@ from s2vomb.catalogue import CatalogueStore, STACClient, build_search_body
 from s2vomb.geometry import load_geometry
 from s2vomb.models import (
     deduplicate_records,
+    filter_records_by_date,
     filter_records_by_year,
     normalize_stac_item,
     select_one_per_year_near_cloud,
@@ -159,6 +161,25 @@ def test_year_filtering(product_record):
     )
     assert filter_records_by_year([product_record, older], 2024) == [product_record]
     assert len(filter_records_by_year([product_record, older], None)) == 2
+
+
+def test_inclusive_date_filtering(product_record):
+    before = replace(
+        product_record,
+        product_id="00000000-0000-4000-8000-000000000000",
+        acquisition_datetime="2024-01-01T23:59:59Z",
+    )
+    after = replace(
+        product_record,
+        product_id="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        acquisition_datetime="2024-01-16T00:00:00Z",
+    )
+
+    selected = filter_records_by_date(
+        [before, product_record, after], date(2024, 1, 2), date(2024, 1, 15)
+    )
+
+    assert selected == [product_record]
 
 
 def test_selects_one_per_year_nearest_cloud_deterministically(product_record):

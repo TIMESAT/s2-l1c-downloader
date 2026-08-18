@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from s2vomb.catalogue import CatalogueStore
-from s2vomb.download import download_products, product_target, verify_local_file
+from s2vomb.download import (
+    download_products,
+    product_safe_directory,
+    product_target,
+    verify_local_file,
+    verify_safe_directory,
+)
 
 
 class NoAuth:
@@ -67,6 +73,29 @@ def test_already_downloaded_detection_skips_authentication(app_config, zipped_re
     assert saved.download_status == "completed"
     assert saved.checksum_verified is True
     assert verify_local_file(target, saved).valid
+
+
+def test_extracted_safe_detection_skips_authentication(app_config, zipped_record):
+    record, _ = zipped_record
+    store = CatalogueStore(app_config)
+    store.write_csv([record])
+    safe = product_safe_directory(app_config, record)
+    image_data = safe / "GRANULE" / "L1C_TEST" / "IMG_DATA"
+    image_data.mkdir(parents=True)
+    (safe / "manifest.safe").write_text("manifest", encoding="utf-8")
+    (safe / "MTD_MSIL1C.xml").write_text("<xml/>", encoding="utf-8")
+    (image_data / "B01.jp2").write_bytes(b"jp2-data")
+
+    result = download_products(app_config, [record], store, token_manager=NoAuth())
+
+    assert result.already_present == 1
+    assert result.downloaded == 0
+    saved = store.read()[0]
+    assert saved.download_status == "existing-safe"
+    assert saved.local_path == str(safe)
+    assert saved.checksum_verified is False
+    assert verify_safe_directory(safe).valid
+    assert not product_target(app_config, record).exists()
 
 
 def test_resumes_partial_download_and_checkpoints_catalogue(app_config, zipped_record):

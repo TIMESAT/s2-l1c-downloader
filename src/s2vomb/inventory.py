@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
+from datetime import date
 from pathlib import Path
 from statistics import mean, median
 from typing import Any
@@ -87,12 +88,18 @@ def render_inventory(
     *,
     heading: str = "Archive inventory",
     year: int | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
 ) -> str:
     sentinel = config.sentinel
     end = "present" if sentinel.end_date_was_open else sentinel.end_date.isoformat()
     date_range = f"{sentinel.start_date.isoformat()} – {end}"
     if year is not None:
         date_range = f"{year}-01-01 – {year}-12-31"
+    elif start_date is not None or end_date is not None:
+        lower = start_date.isoformat() if start_date else sentinel.start_date.isoformat()
+        upper = end_date.isoformat() if end_date else end
+        date_range = f"{lower} – {upper}"
     years = list(inventory.products_per_year)
     years_text = "none" if not years else f"{years[0]}–{years[-1]}"
     tiles = ", ".join(inventory.tile_ids) if inventory.tile_ids else "none"

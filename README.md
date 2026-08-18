@@ -148,6 +148,13 @@ Start with an authentication-free dry run:
 s2vomb download --config config/vombsjon.yaml --year 2024 --dry-run
 ```
 
+An inclusive short date window can be selected without rebuilding the catalogue:
+
+```bash
+s2vomb download --config config/vombsjon.yaml \
+  --start-date 2026-08-01 --end-date 2026-08-15 --dry-run
+```
+
 For a small cross-year processor test, select the single scene in each year whose scene-level
 cloud metadata is nearest a target percentage:
 
@@ -188,6 +195,12 @@ atomic. Valid completed products are skipped. An invalid existing final archive 
 recoverable `*.invalid-<timestamp>` name before a new transfer; it is never silently deleted.
 State is atomically checkpointed to CSV after each product, and failures are written beside the
 download run manifest.
+
+If a matching extracted `.SAFE` directory already exists beside the expected ZIP, the downloader
+checks for `manifest.safe`, `MTD_MSIL1C.xml`, `GRANULE`, and JP2 imagery, records the product as
+`existing-safe`, and skips the download. The archive checksum cannot be reverified after the ZIP
+has been deleted, so `checksum_verified` is deliberately false for this state. Incomplete SAFE
+directories are left untouched and do not suppress a download.
 
 ## Data organization
 

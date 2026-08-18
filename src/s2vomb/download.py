@@ -74,6 +74,31 @@ def product_target(config: AppConfig, record: ProductRecord) -> Path:
     return config.download.directory / year / filename
 
 
+def product_safe_directory(config: AppConfig, record: ProductRecord) -> Path:
+    """Return the expected extracted SAFE directory beside the source ZIP."""
+    return product_target(config, record).with_suffix("")
+
+
+def verify_safe_directory(path: Path) -> VerificationResult:
+    """Apply a conservative structural check to an extracted Sentinel-2 L1C SAFE."""
+    if not path.is_dir():
+        return VerificationResult(False, False, 0, "directory does not exist")
+
+    required_files = (path / "manifest.safe", path / "MTD_MSIL1C.xml")
+    for required in required_files:
+        if not required.is_file() or required.stat().st_size == 0:
+            return VerificationResult(False, False, 0, f"missing or empty {required.name}")
+
+    granule = path / "GRANULE"
+    if not granule.is_dir():
+        return VerificationResult(False, False, 0, "missing GRANULE directory")
+    if not any(candidate.is_file() for candidate in granule.rglob("*.jp2")):
+        return VerificationResult(False, False, 0, "GRANULE contains no JP2 imagery")
+
+    size = sum(candidate.stat().st_size for candidate in path.rglob("*") if candidate.is_file())
+    return VerificationResult(True, False, size)
+
+
 def verify_local_file(
     path: Path,
     record: ProductRecord,
@@ -403,6 +428,31 @@ def download_products(
                 "Moved invalid existing archive to %s (%s)",
                 quarantine,
                 verification.reason,
+            )
+        safe_directory = product_safe_directory(config, record)
+        safe_verification = verify_safe_directory(safe_directory)
+        if safe_verification.valid:
+            outcome = DownloadOutcome(
+                record.product_id,
+                "already-present",
+                safe_directory,
+                safe_verification.size,
+                False,
+                0,
+            )
+            record.download_status = "existing-safe"
+            record.local_path = str(safe_directory)
+            record.downloaded_bytes = safe_verification.size
+            record.checksum_verified = False
+            record.last_error = ""
+            outcomes.append(outcome)
+            log.info("Already extracted SAFE: %s", record.product_name)
+            continue
+        if safe_directory.exists():
+            log.warning(
+                "Ignoring incomplete extracted SAFE %s (%s)",
+                safe_directory,
+                safe_verification.reason,
             )
         partial = target.with_name(f"{target.name}.part")
         if partial.is_file():

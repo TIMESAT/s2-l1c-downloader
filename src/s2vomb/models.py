@@ -6,6 +6,7 @@ import json
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass, fields
+from datetime import date
 from typing import Any
 
 from .utils import CatalogueError, parse_iso_datetime, parse_multihash
@@ -211,6 +212,25 @@ def filter_records_by_year(
     if year is None:
         return list(records)
     return [record for record in records if record.year == year]
+
+
+def filter_records_by_date(
+    records: Iterable[ProductRecord],
+    start_date: date | None,
+    end_date: date | None,
+) -> list[ProductRecord]:
+    """Filter records inclusively by UTC acquisition date."""
+    if start_date and end_date and end_date < start_date:
+        raise ValueError("end date must not be earlier than start date")
+    selected: list[ProductRecord] = []
+    for record in records:
+        acquired = parse_iso_datetime(record.acquisition_datetime).date()
+        if start_date is not None and acquired < start_date:
+            continue
+        if end_date is not None and acquired > end_date:
+            continue
+        selected.append(record)
+    return selected
 
 
 def select_one_per_year_near_cloud(
