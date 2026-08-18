@@ -25,7 +25,7 @@ from .models import (
     normalize_stac_item,
     sort_records,
 )
-from .utils import CatalogueError, atomic_write_json, atomic_write_text
+from .utils import CatalogueError, atomic_write_json, atomic_write_text, canonical_json
 
 
 @dataclass(slots=True)
@@ -41,7 +41,6 @@ def build_search_body(config: AppConfig, geometry: GeometrySelection) -> dict[st
     sentinel = config.sentinel
     body: dict[str, Any] = {
         "collections": [sentinel.collection],
-        "intersects": geometry.geometry,
         "datetime": (
             f"{sentinel.start_date.isoformat()}T00:00:00Z/"
             f"{sentinel.end_date.isoformat()}T23:59:59.999999Z"
@@ -54,6 +53,8 @@ def build_search_body(config: AppConfig, geometry: GeometrySelection) -> dict[st
         query["platform"] = {"eq": sentinel.platform}
     if sentinel.tile_id:
         query["grid:code"] = {"eq": f"MGRS-{sentinel.tile_id.removeprefix('T')}"}
+    else:
+        body["intersects"] = geometry.geometry
     if sentinel.max_scene_cloud_cover is not None:
         query["eo:cloud_cover"] = {"lte": sentinel.max_scene_cloud_cover}
     if query:
@@ -101,12 +102,17 @@ class STACClient:
         next_url = self.config.api.stac_search_url
         next_method = "POST"
         next_body: dict[str, Any] | None = body
-        seen_pages: set[str] = set()
+        seen_pages: set[tuple[str, str, str]] = set()
         try:
             while next_url:
-                if next_url in seen_pages:
+                page_fingerprint = (
+                    next_method,
+                    next_url,
+                    canonical_json(next_body) if next_body is not None else "",
+                )
+                if page_fingerprint in seen_pages:
                     raise CatalogueError(f"STAC pagination loop detected at {next_url}")
-                seen_pages.add(next_url)
+                seen_pages.add(page_fingerprint)
                 self._validate_page_url(next_url)
                 try:
                     if next_method == "POST":
@@ -155,7 +161,15 @@ class STACClient:
         finally:
             session.close()
 
-        normalized = [normalize_stac_item(item, geometry.sha256) for item in features]
+        tile_search = self.config.sentinel.tile_id is not None
+        normalized = [
+            normalize_stac_item(
+                item,
+                "" if tile_search else geometry.sha256,
+                search_method="stac-tile-query" if tile_search else "stac-intersects",
+            )
+            for item in features
+        ]
         records, duplicates = deduplicate_records(normalized)
         collection = {
             "type": "FeatureCollection",

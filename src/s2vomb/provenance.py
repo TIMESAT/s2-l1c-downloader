@@ -80,6 +80,7 @@ def begin_run(
         "query": {
             "collection": config.sentinel.collection,
             "processing_level": config.sentinel.processing_level,
+            "spatial_mode": "tile" if config.sentinel.tile_id else "geometry",
             "start_date": config.sentinel.start_date.isoformat(),
             "end_date": config.sentinel.end_date.isoformat(),
             "end_date_was_open": config.sentinel.end_date_was_open,

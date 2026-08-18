@@ -104,7 +104,12 @@ def _tile_id(value: Any, stac_id: str) -> str:
     return f"T{match.group(1)}" if match else ""
 
 
-def normalize_stac_item(item: dict[str, Any], search_geometry_sha256: str) -> ProductRecord:
+def normalize_stac_item(
+    item: dict[str, Any],
+    search_geometry_sha256: str,
+    *,
+    search_method: str = "stac-intersects",
+) -> ProductRecord:
     if not isinstance(item, dict) or item.get("type") != "Feature":
         raise CatalogueError("STAC search returned a non-Feature item")
     stac_id = str(item.get("id", ""))
@@ -174,7 +179,7 @@ def normalize_stac_item(item: dict[str, Any], search_geometry_sha256: str) -> Pr
         collection=collection,
         published=str(properties.get("published", "")),
         search_geometry_sha256=search_geometry_sha256,
-        search_intersection="stac-intersects",
+        search_intersection=search_method,
         item_bbox=json.dumps(bbox, separators=(",", ":")),
         item_geometry=json.dumps(geometry, separators=(",", ":")),
     )
@@ -206,3 +211,26 @@ def filter_records_by_year(
     if year is None:
         return list(records)
     return [record for record in records if record.year == year]
+
+
+def select_one_per_year_near_cloud(
+    records: Iterable[ProductRecord], target_cloud_cover: float
+) -> list[ProductRecord]:
+    """Select one deterministic scene per year nearest a scene-cloud target."""
+    if not 0 <= target_cloud_cover <= 100:
+        raise ValueError("target cloud cover must be between 0 and 100")
+    grouped: dict[int, list[ProductRecord]] = {}
+    for record in records:
+        if record.cloud_cover is not None:
+            grouped.setdefault(record.year, []).append(record)
+    return [
+        min(
+            grouped[year],
+            key=lambda record: (
+                abs(record.cloud_cover - target_cloud_cover),  # type: ignore[operator]
+                record.acquisition_datetime,
+                record.product_name,
+            ),
+        )
+        for year in sorted(grouped)
+    ]

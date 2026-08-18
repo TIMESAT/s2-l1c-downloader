@@ -15,13 +15,13 @@ and can later feed ACOLITE-DSF, ESA SNAP/C2RCC/C2X, or direct top-of-atmosphere 
 
 Vombsjön covers only a small part of a Sentinel-2 tile. Scene/tile-level cloud percentage can
 therefore be a poor proxy for conditions over the lake. The default configuration applies **no
-cloud threshold**. It catalogues every intersecting L1C product and records `eo:cloud_cover` for
-later review. An optional, permissive threshold can be configured, but ROI-specific cloud
-screening belongs in a downstream workflow.
+cloud threshold**. With the supplied configuration it catalogues every L1C product in the
+specified MGRS tile and records `eo:cloud_cover` for later review. An optional, permissive
+threshold can be configured, but ROI-specific cloud screening belongs in a downstream workflow.
 
 Two spatial concepts are versioned in [`config/vombsjon.geojson`](config/vombsjon.geojson):
 
-- `vombsjon-search` is a compact WGS84 polygon used only for product discovery.
+- `vombsjon-search` is a compact WGS84 polygon used as the discovery fallback when no tile is set.
 - `vombsjon-processing-roi-5km` is an approximate lake-plus-5 km context ROI stored for later
   processing. It never crops the source download.
 
@@ -33,7 +33,8 @@ the exact geometry and its SHA-256 are captured in every run manifest.
 
 The workflow is deliberately staged:
 
-1. `search` sends the configured polygon/date/filter query to the public CDSE STAC 1.1 API.
+1. `search` sends the configured tile/date/filter query to the public CDSE STAC 1.1 API. If
+   `tile_id` is null, it falls back to the configured polygon.
 2. STAC items are normalized to a chronological CSV catalogue; raw STAC JSON and optional
    Parquet are also retained.
 3. `inventory` reports product counts, temporal/platform/tile distributions, scene cloud
@@ -101,7 +102,7 @@ sentinel:
   start_date: "2017-01-01"
   end_date: null
   platform: null                 # e.g. S2A or sentinel-2b
-  tile_id: null                  # e.g. T33UVB
+  tile_id: T33UVB               # set null to use the search polygon instead
   max_scene_cloud_cover: null    # leave null for the research archive
 ```
 
@@ -146,6 +147,16 @@ Start with an authentication-free dry run:
 ```bash
 s2vomb download --config config/vombsjon.yaml --year 2024 --dry-run
 ```
+
+For a small cross-year processor test, select the single scene in each year whose scene-level
+cloud metadata is nearest a target percentage:
+
+```bash
+s2vomb download --config config/vombsjon.yaml --one-per-year-near-cloud 40 --dry-run
+```
+
+This is deterministic and records the target in the run manifest. It uses tile/scene cloud
+metadata only; it is not ROI-specific cloud screening.
 
 It prints the exact targets without opening a network download. Then launch the real transfer:
 

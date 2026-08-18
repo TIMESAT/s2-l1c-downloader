@@ -15,7 +15,12 @@ from .config import AppConfig, load_config
 from .download import DownloadBatchResult, download_products
 from .geometry import GeometrySelection, load_geometry
 from .inventory import calculate_inventory, render_inventory, write_inventory
-from .models import CATALOGUE_FIELDS, ProductRecord, filter_records_by_year
+from .models import (
+    CATALOGUE_FIELDS,
+    ProductRecord,
+    filter_records_by_year,
+    select_one_per_year_near_cloud,
+)
 from .provenance import RunContext, begin_run, configure_logging
 from .utils import S2VombError, atomic_write_json, atomic_write_text
 
@@ -54,6 +59,12 @@ def _parser() -> argparse.ArgumentParser:
     download.add_argument(
         "--yes", action="store_true", help="skip the interactive storage confirmation"
     )
+    download.add_argument(
+        "--one-per-year-near-cloud",
+        type=_cloud_cover,
+        metavar="PERCENT",
+        help="select one product per year whose scene cloud cover is nearest PERCENT",
+    )
     return parser
 
 
@@ -73,6 +84,13 @@ def _year(value: str) -> int:
     parsed = int(value)
     if parsed < 2015 or parsed > 2200:
         raise argparse.ArgumentTypeError("must be a four-digit Sentinel-2 acquisition year")
+    return parsed
+
+
+def _cloud_cover(value: str) -> float:
+    parsed = float(value)
+    if not 0 <= parsed <= 100:
+        raise argparse.ArgumentTypeError("must be between 0 and 100")
     return parsed
 
 
@@ -214,15 +232,31 @@ def _download(args: argparse.Namespace, config: AppConfig, context: RunContext) 
     logger = configure_logging(context, verbose=args.verbose)
     store = CatalogueStore(config)
     records = filter_records_by_year(store.read(), args.year)
+    if args.one_per_year_near_cloud is not None:
+        records = select_one_per_year_near_cloud(records, args.one_per_year_near_cloud)
     inventory = calculate_inventory(records)
     print(render_inventory(config, inventory, heading="Download selection", year=args.year))
     if not records:
         print("No catalogue records match the requested filters.")
-        context.finish(status="completed", filters={"year": args.year}, download={"selected": 0})
+        context.finish(
+            status="completed",
+            filters={
+                "year": args.year,
+                "one_per_year_near_cloud": args.one_per_year_near_cloud,
+            },
+            download={"selected": 0},
+        )
         return 0
     if not args.dry_run and not args.yes and not _confirm_download():
         print("Download cancelled; the catalogue was not changed.")
-        context.finish(status="cancelled", filters={"year": args.year}, download={"selected": 0})
+        context.finish(
+            status="cancelled",
+            filters={
+                "year": args.year,
+                "one_per_year_near_cloud": args.one_per_year_near_cloud,
+            },
+            download={"selected": 0},
+        )
         return 0
 
     result = download_products(config, records, store, dry_run=args.dry_run, logger=logger)
@@ -241,7 +275,10 @@ def _download(args: argparse.Namespace, config: AppConfig, context: RunContext) 
     failure_file = _write_failures(context, result)
     context.finish(
         status="completed" if result.failed == 0 else "completed-with-failures",
-        filters={"year": args.year},
+        filters={
+            "year": args.year,
+            "one_per_year_near_cloud": args.one_per_year_near_cloud,
+        },
         download={
             "dry_run": args.dry_run,
             "selected": result.selected,
@@ -264,7 +301,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         search_geometry = load_geometry(
             config.study_area.geometry, config.study_area.search_feature
         )
-        context = begin_run(config, args.command, search_geometry)
+        query_geometry = None if config.sentinel.tile_id else search_geometry
+        context = begin_run(config, args.command, query_geometry)
         if args.command == "search":
             return _search(args, config, context)
         if args.command == "inventory":

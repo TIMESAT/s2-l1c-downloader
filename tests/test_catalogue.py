@@ -10,6 +10,7 @@ from s2vomb.models import (
     deduplicate_records,
     filter_records_by_year,
     normalize_stac_item,
+    select_one_per_year_near_cloud,
 )
 
 
@@ -55,6 +56,19 @@ def test_search_body_has_intersection_and_no_default_cloud_filter(app_config):
     assert "query" not in body
 
 
+def test_configured_tile_replaces_geometry_intersection(app_config):
+    geometry = load_geometry(app_config.study_area.geometry, "search")
+    tile_config = replace(
+        app_config,
+        sentinel=replace(app_config.sentinel, tile_id="T33UVB"),
+    )
+
+    body = build_search_body(tile_config, geometry)
+
+    assert "intersects" not in body
+    assert body["query"]["grid:code"] == {"eq": "MGRS-33UVB"}
+
+
 def test_stac_pagination_and_normalization(app_config):
     first = make_stac_item()
     second = make_stac_item(
@@ -86,6 +100,39 @@ def test_stac_pagination_and_normalization(app_config):
     assert session.closed
 
 
+def test_post_pagination_may_reuse_search_url(app_config):
+    first = make_stac_item()
+    second = make_stac_item(
+        stac_id="S2B_MSIL1C_20240203T102431_N0510_R065_T33UVB_20240203T120000",
+        product_uuid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        acquired="2024-02-03T10:24:31Z",
+    )
+    search_url = app_config.api.stac_search_url
+    pages = [
+        {
+            "type": "FeatureCollection",
+            "features": [first],
+            "links": [
+                {
+                    "rel": "next",
+                    "href": search_url,
+                    "method": "POST",
+                    "body": {"token": "page-2"},
+                }
+            ],
+        },
+        {"type": "FeatureCollection", "features": [second], "links": []},
+    ]
+    session = FakeSession(pages)
+    geometry = load_geometry(app_config.study_area.geometry, "search")
+
+    result = STACClient(app_config, session_factory=lambda: session).search(geometry)
+
+    assert len(result.records) == 2
+    assert result.pages == 2
+    assert session.posts[1][1] == {"token": "page-2"}
+
+
 def test_duplicate_detection_and_previous_state(app_config):
     record = normalize_stac_item(make_stac_item(), "hash")
     unique, duplicates = deduplicate_records([record, replace(record)])
@@ -112,3 +159,34 @@ def test_year_filtering(product_record):
     )
     assert filter_records_by_year([product_record, older], 2024) == [product_record]
     assert len(filter_records_by_year([product_record, older], None)) == 2
+
+
+def test_selects_one_per_year_nearest_cloud_deterministically(product_record):
+    same_year = replace(
+        product_record,
+        product_id="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        stac_id="same-year",
+        acquisition_datetime="2024-02-01T10:00:00Z",
+        cloud_cover=39.8,
+    )
+    other_year = replace(
+        product_record,
+        product_id="99999999-8888-4777-8666-555555555555",
+        stac_id="other-year",
+        acquisition_datetime="2023-06-01T10:00:00Z",
+        cloud_cover=42.0,
+    )
+    missing_cloud = replace(
+        product_record,
+        product_id="00000000-1111-4222-8333-444444444444",
+        stac_id="missing-cloud",
+        acquisition_datetime="2022-06-01T10:00:00Z",
+        cloud_cover=None,
+    )
+
+    selected = select_one_per_year_near_cloud(
+        [product_record, same_year, other_year, missing_cloud], 40
+    )
+
+    assert [record.year for record in selected] == [2023, 2024]
+    assert selected[1] == same_year

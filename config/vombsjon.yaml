@@ -17,6 +17,8 @@ sentinel:
   # in every effective configuration and run manifest.
   end_date: null
   platform: null
+  # When set, discovery uses this complete MGRS tile and does not apply the
+  # search polygon. Set null to fall back to the configured search geometry.
   tile_id: "T33UVB"
   # Deliberately disabled by default. Tile cloud percentage is not a reliable
   # proxy for cloud over a small lake.
