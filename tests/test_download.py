@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 
 from s2vomb.catalogue import CatalogueStore
@@ -54,6 +55,53 @@ class ResumeSession:
         assert headers["Range"] == f"bytes={self.start}-"
         assert headers["Authorization"] == "Bearer test-token"
         return StreamResponse(self.body, self.start, self.total)
+
+    def close(self):
+        pass
+
+
+class FullResponse:
+    status_code = 200
+
+    def __init__(self, body):
+        self.body = body
+        self.headers = {"Content-Length": str(len(body))}
+
+    def iter_content(self, chunk_size):
+        yield self.body
+
+    def close(self):
+        pass
+
+
+class MetadataResponse:
+    status_code = 200
+
+    def __init__(self, size, digest):
+        self.size = size
+        self.digest = digest
+
+    def json(self):
+        return {
+            "ContentLength": self.size,
+            "Checksum": [{"Algorithm": "MD5", "Value": self.digest}],
+        }
+
+    def close(self):
+        pass
+
+
+class StaleChecksumSession:
+    def __init__(self, body):
+        self.body = body
+        self.headers = {}
+        self.calls = []
+
+    def get(self, url, **kwargs):
+        self.calls.append(url)
+        if "catalogue.dataspace.copernicus.eu" in url:
+            return MetadataResponse(len(self.body), hashlib.md5(self.body).hexdigest())
+        return FullResponse(self.body)
 
     def close(self):
         pass
@@ -145,6 +193,30 @@ def test_resumes_partial_download_and_checkpoints_catalogue(app_config, zipped_r
     assert saved.download_status == "completed"
     assert saved.checksum_verified is True
     assert saved.downloaded_bytes == len(payload)
+
+
+def test_stale_stac_checksum_is_refreshed_from_odata(app_config, zipped_record):
+    record, payload = zipped_record
+    record = replace(record, checksum="d50110" + "00" * 16)
+    store = CatalogueStore(app_config)
+    store.write_csv([record])
+    session = StaleChecksumSession(payload)
+
+    result = download_products(
+        app_config,
+        [record],
+        store,
+        token_manager=StaticToken(),
+        session_factory=lambda: session,
+    )
+
+    saved = store.read()[0]
+    assert result.downloaded == 1
+    assert result.failed == 0
+    assert saved.checksum == "d50110" + hashlib.md5(payload).hexdigest()
+    assert saved.checksum_verified is True
+    assert saved.attempts == 1
+    assert len(session.calls) == 2
 
 
 def test_dry_run_does_not_create_archive(app_config, product_record):

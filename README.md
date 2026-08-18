@@ -196,11 +196,32 @@ recoverable `*.invalid-<timestamp>` name before a new transfer; it is never sile
 State is atomically checkpointed to CSV after each product, and failures are written beside the
 download run manifest.
 
+Some older reprocessed products have a stale checksum in STAC. On a checksum mismatch, the
+downloader makes one read-only request to the official CDSE OData catalogue, refreshes the current
+archive size/checksum, writes that metadata back to the local catalogue, and verifies the same
+download again before considering a retry. A genuine mismatch against current OData metadata
+still fails normally.
+
 If a matching extracted `.SAFE` directory already exists beside the expected ZIP, the downloader
 checks for `manifest.safe`, `MTD_MSIL1C.xml`, `GRANULE`, and JP2 imagery, records the product as
 `existing-safe`, and skips the download. The archive checksum cannot be reverified after the ZIP
 has been deleted, so `checksum_verified` is deliberately false for this state. Incomplete SAFE
 directories are left untouched and do not suppress a download.
+
+On Linux or macOS, verified batch extraction is available as a separate, explicit step:
+
+```bash
+scripts/extract_verified.sh --dry-run
+scripts/extract_verified.sh
+```
+
+The script recursively finds `*.SAFE.zip`, tests ZIP integrity and entry paths, extracts into a
+temporary sibling directory, verifies core SAFE metadata and JP2 imagery, atomically installs the
+SAFE directory, and only then deletes its ZIP. It writes `data/logs/extract-<timestamp>.log` and
+returns a nonzero status if any product fails. Use `--keep-zip` to preserve verified source
+archives, or `--directory PATH` to scan another archive root. Deleting the ZIP removes the exact
+downloaded byte stream and prevents later archive-checksum revalidation; retaining it remains the
+preferred publication-archive policy when storage permits.
 
 ## Data organization
 

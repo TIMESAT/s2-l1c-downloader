@@ -37,6 +37,7 @@ class SentinelConfig:
 @dataclass(frozen=True, slots=True)
 class APIConfig:
     stac_search_url: str
+    catalogue_odata_url: str
     token_url: str
     download_base_url: str
     request_timeout_seconds: int
@@ -269,6 +270,14 @@ def load_config(path: str | Path, *, today: date | None = None) -> AppConfig:
             api.get("stac_search_url"),
             "api.stac_search_url",
             "stac.dataspace.copernicus.eu",
+        ),
+        catalogue_odata_url=_official_url(
+            api.get(
+                "catalogue_odata_url",
+                "https://catalogue.dataspace.copernicus.eu/odata/v1",
+            ),
+            "api.catalogue_odata_url",
+            "catalogue.dataspace.copernicus.eu",
         ),
         token_url=_official_url(
             api.get("token_url"),

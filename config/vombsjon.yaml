@@ -26,6 +26,7 @@ sentinel:
 
 api:
   stac_search_url: "https://stac.dataspace.copernicus.eu/v1/search"
+  catalogue_odata_url: "https://catalogue.dataspace.copernicus.eu/odata/v1"
   token_url: "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
   download_base_url: "https://download.dataspace.copernicus.eu/odata/v1"
   request_timeout_seconds: 120

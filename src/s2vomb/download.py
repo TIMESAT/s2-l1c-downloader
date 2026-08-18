@@ -25,6 +25,7 @@ from .utils import (
     AuthenticationError,
     DownloadError,
     checksum_file,
+    checksum_multihash,
     parse_multihash,
     safe_product_filename,
     utc_now,
@@ -172,6 +173,77 @@ def _download_url(config: AppConfig, record: ProductRecord) -> str:
     )
 
 
+def _refresh_checksum_from_odata(
+    config: AppConfig,
+    record: ProductRecord,
+    session: requests.Session,
+    log: logging.Logger,
+) -> bool:
+    """Refresh stale STAC archive metadata from the official CDSE OData catalogue."""
+    try:
+        product_uuid = str(uuid.UUID(record.product_id))
+    except (ValueError, AttributeError):
+        return False
+    url = f"{config.api.catalogue_odata_url}/Products({product_uuid})"
+    try:
+        response = session.get(
+            url,
+            params={"$select": "ContentLength,Checksum"},
+            headers={"Accept": "application/json"},
+            timeout=config.api.request_timeout_seconds,
+        )
+        try:
+            if response.status_code != 200:
+                log.warning(
+                    "Could not refresh checksum for %s: CDSE OData HTTP %s",
+                    record.product_name,
+                    response.status_code,
+                )
+                return False
+            payload = response.json()
+        finally:
+            response.close()
+    except (requests.RequestException, ValueError, AttributeError) as error:
+        log.warning("Could not refresh checksum for %s: %s", record.product_name, error)
+        return False
+
+    checksums = payload.get("Checksum") if isinstance(payload, dict) else None
+    if not isinstance(checksums, list):
+        return False
+    supported: dict[str, tuple[str, str]] = {}
+    for item in checksums:
+        if not isinstance(item, dict):
+            continue
+        algorithm = str(item.get("Algorithm", "")).lower().replace("-", "")
+        digest = str(item.get("Value", "")).lower()
+        if algorithm in {"md5", "sha1", "sha256", "sha512"}:
+            try:
+                supported[algorithm] = (checksum_multihash(algorithm, digest), digest)
+            except ValueError:
+                continue
+    for algorithm in ("sha512", "sha256", "sha1", "md5"):
+        current = supported.get(algorithm)
+        if current is None:
+            continue
+        multihash, _ = current
+        old_checksum = record.checksum
+        record.checksum = multihash
+        record.checksum_algorithm = algorithm
+        content_length = payload.get("ContentLength")
+        try:
+            if content_length not in (None, ""):
+                record.product_size_bytes = int(content_length)
+        except (TypeError, ValueError):
+            pass
+        if multihash != old_checksum:
+            log.warning(
+                "Refreshed stale STAC checksum from CDSE OData for %s",
+                record.product_name,
+            )
+        return True
+    return False
+
+
 def _response_total(response: requests.Response, offset: int) -> int | None:
     content_range = response.headers.get("Content-Range", "")
     match = _CONTENT_RANGE.fullmatch(content_range.strip())
@@ -209,6 +281,7 @@ def _download_one(
     log = logging.getLogger("s2vomb")
     latest_error = "download did not start"
     attempts_used = 0
+    checksum_refreshed = False
     max_attempts = config.download.retries + 1
     session = session_factory()
     session.headers["User-Agent"] = f"s2vomb/{__version__}"
@@ -306,6 +379,19 @@ def _download_one(
                     verify_checksum=config.download.verify_checksum,
                     expected_size=record.product_size_bytes or expected_from_http,
                 )
+                if (
+                    not verification.valid
+                    and "checksum mismatch" in verification.reason
+                    and not checksum_refreshed
+                ):
+                    checksum_refreshed = True
+                    if _refresh_checksum_from_odata(config, record, session, log):
+                        verification = verify_local_file(
+                            partial,
+                            record,
+                            verify_checksum=config.download.verify_checksum,
+                            expected_size=record.product_size_bytes or expected_from_http,
+                        )
                 if not verification.valid:
                     latest_error = verification.reason
                     expected_total = record.product_size_bytes or expected_from_http

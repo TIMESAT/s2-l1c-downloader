@@ -19,6 +19,9 @@ def test_example_configuration_resolves_open_end_date():
     assert config.sentinel.max_scene_cloud_cover is None
     assert config.download.workers == 2
     assert config.download.layout == "tile"
+    assert config.api.catalogue_odata_url == (
+        "https://catalogue.dataspace.copernicus.eu/odata/v1"
+    )
     assert config.study_area.geometry == repository / "config/vombsjon.geojson"
 
 

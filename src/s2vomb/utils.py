@@ -129,6 +129,24 @@ def parse_multihash(value: str) -> tuple[str | None, str | None]:
     return algorithms.get(code), digest.hex()
 
 
+def checksum_multihash(algorithm: str, digest: str) -> str:
+    """Encode a supported hexadecimal digest as a STAC multihash."""
+    prefixes = {
+        "md5": bytes.fromhex("d50110"),
+        "sha1": bytes.fromhex("1114"),
+        "sha256": bytes.fromhex("1220"),
+        "sha512": bytes.fromhex("1340"),
+    }
+    normalized = algorithm.lower().replace("-", "")
+    prefix = prefixes.get(normalized)
+    if prefix is None:
+        raise ValueError(f"unsupported checksum algorithm: {algorithm}")
+    raw_digest = bytes.fromhex(digest)
+    if len(raw_digest) != prefix[-1]:
+        raise ValueError(f"invalid {normalized} digest length")
+    return (prefix + raw_digest).hex()
+
+
 def checksum_file(path: Path, algorithm: str, chunk_size: int = 8 * 1024 * 1024) -> str:
     digest = hashlib.new(algorithm)
     with path.open("rb") as stream:
