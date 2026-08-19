@@ -498,100 +498,120 @@ def download_products(
 
     outcomes: list[DownloadOutcome] = []
     pending: list[ProductRecord] = []
-    for record in records:
-        target = product_target(config, record)
-        found_existing = False
-        archive_candidates = product_archive_candidates(config, record)
-        for existing_archive in archive_candidates:
-            if existing_archive.is_file():
-                verification = verify_local_file(
-                    existing_archive, record, verify_checksum=config.download.verify_checksum
-                )
-                if verification.valid:
+    metadata_session: requests.Session | None = None
+    try:
+        for record in records:
+            target = product_target(config, record)
+            found_existing = False
+            archive_candidates = product_archive_candidates(config, record)
+            for existing_archive in archive_candidates:
+                if existing_archive.is_file():
+                    verification = verify_local_file(
+                        existing_archive, record, verify_checksum=config.download.verify_checksum
+                    )
+                    if (
+                        not verification.valid
+                        and "checksum mismatch" in verification.reason
+                    ):
+                        if metadata_session is None:
+                            metadata_session = session_factory()
+                            metadata_session.headers["User-Agent"] = f"s2l1c/{__version__}"
+                        if _refresh_checksum_from_odata(
+                            config, record, metadata_session, log
+                        ):
+                            verification = verify_local_file(
+                                existing_archive,
+                                record,
+                                verify_checksum=config.download.verify_checksum,
+                            )
+                    if verification.valid:
+                        outcome = DownloadOutcome(
+                            record.product_id,
+                            "already-present",
+                            existing_archive,
+                            verification.size,
+                            verification.checksum_verified,
+                            0,
+                        )
+                        record.download_status = "completed"
+                        record.local_path = str(existing_archive)
+                        record.downloaded_bytes = verification.size
+                        record.checksum_verified = verification.checksum_verified
+                        record.last_error = ""
+                        outcomes.append(outcome)
+                        log.info("Already complete: %s", record.product_name)
+                        found_existing = True
+                        break
+                    quarantine = _quarantine_invalid(existing_archive)
+                    log.warning(
+                        "Moved invalid existing archive to %s (%s)",
+                        quarantine,
+                        verification.reason,
+                    )
+            if found_existing:
+                continue
+            for archive_candidate in archive_candidates:
+                safe_directory = archive_candidate.with_suffix("")
+                safe_verification = verify_safe_directory(safe_directory)
+                if safe_verification.valid:
                     outcome = DownloadOutcome(
                         record.product_id,
                         "already-present",
-                        existing_archive,
+                        safe_directory,
+                        safe_verification.size,
+                        False,
+                        0,
+                    )
+                    record.download_status = "existing-safe"
+                    record.local_path = str(safe_directory)
+                    record.downloaded_bytes = safe_verification.size
+                    record.checksum_verified = False
+                    record.last_error = ""
+                    outcomes.append(outcome)
+                    log.info("Already extracted SAFE: %s", record.product_name)
+                    found_existing = True
+                    break
+                if safe_directory.exists():
+                    log.warning(
+                        "Ignoring incomplete extracted SAFE %s (%s)",
+                        safe_directory,
+                        safe_verification.reason,
+                    )
+            if found_existing:
+                continue
+            partial = target.with_name(f"{target.name}.part")
+            if partial.is_file():
+                verification = verify_local_file(
+                    partial, record, verify_checksum=config.download.verify_checksum
+                )
+                if verification.valid:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(partial, target)
+                    outcome = DownloadOutcome(
+                        record.product_id,
+                        "already-present",
+                        target,
                         verification.size,
                         verification.checksum_verified,
                         0,
                     )
                     record.download_status = "completed"
-                    record.local_path = str(existing_archive)
+                    record.local_path = str(target)
                     record.downloaded_bytes = verification.size
                     record.checksum_verified = verification.checksum_verified
                     record.last_error = ""
                     outcomes.append(outcome)
-                    log.info("Already complete: %s", record.product_name)
-                    found_existing = True
-                    break
-                quarantine = _quarantine_invalid(existing_archive)
-                log.warning(
-                    "Moved invalid existing archive to %s (%s)",
-                    quarantine,
-                    verification.reason,
-                )
-        if found_existing:
-            continue
-        for archive_candidate in archive_candidates:
-            safe_directory = archive_candidate.with_suffix("")
-            safe_verification = verify_safe_directory(safe_directory)
-            if safe_verification.valid:
-                outcome = DownloadOutcome(
-                    record.product_id,
-                    "already-present",
-                    safe_directory,
-                    safe_verification.size,
-                    False,
-                    0,
-                )
-                record.download_status = "existing-safe"
-                record.local_path = str(safe_directory)
-                record.downloaded_bytes = safe_verification.size
-                record.checksum_verified = False
-                record.last_error = ""
-                outcomes.append(outcome)
-                log.info("Already extracted SAFE: %s", record.product_name)
-                found_existing = True
-                break
-            if safe_directory.exists():
-                log.warning(
-                    "Ignoring incomplete extracted SAFE %s (%s)",
-                    safe_directory,
-                    safe_verification.reason,
-                )
-        if found_existing:
-            continue
-        partial = target.with_name(f"{target.name}.part")
-        if partial.is_file():
-            verification = verify_local_file(
-                partial, record, verify_checksum=config.download.verify_checksum
-            )
-            if verification.valid:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(partial, target)
-                outcome = DownloadOutcome(
-                    record.product_id,
-                    "already-present",
-                    target,
-                    verification.size,
-                    verification.checksum_verified,
-                    0,
-                )
-                record.download_status = "completed"
-                record.local_path = str(target)
-                record.downloaded_bytes = verification.size
-                record.checksum_verified = verification.checksum_verified
-                record.last_error = ""
-                outcomes.append(outcome)
-                continue
-            record.download_status = "partial"
-            record.downloaded_bytes = partial.stat().st_size
-            record.local_path = str(partial)
-        elif record.download_status == "completed":
-            record.download_status = "missing"
-            record.last_error = "catalogue marked complete but local archive is missing"
-        pending.append(record)
+                    continue
+                record.download_status = "partial"
+                record.downloaded_bytes = partial.stat().st_size
+                record.local_path = str(partial)
+            elif record.download_status == "completed":
+                record.download_status = "missing"
+                record.last_error = "catalogue marked complete but local archive is missing"
+            pending.append(record)
+    finally:
+        if metadata_session is not None:
+            metadata_session.close()
 
     store.write_csv(_all_records_with_updates(store, records))
     if not pending:

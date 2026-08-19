@@ -230,8 +230,9 @@ download run manifest.
 Some older reprocessed products have a stale checksum in STAC. On a checksum mismatch, the
 downloader makes one read-only request to the official CDSE OData catalogue, refreshes the current
 archive size/checksum, writes that metadata back to the local catalogue, and verifies the same
-download again before considering a retry. A genuine mismatch against current OData metadata
-still fails normally.
+download again before considering a retry. The same refresh is performed before quarantining an
+existing final ZIP, preventing a valid archive from being renamed because of stale STAC metadata.
+A genuine mismatch against current OData metadata still fails normally.
 
 If a matching extracted `.SAFE` directory already exists beside the expected ZIP, the downloader
 checks for `manifest.safe`, `MTD_MSIL1C.xml`, `GRANULE`, and JP2 imagery, records the product as

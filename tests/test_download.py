@@ -219,6 +219,36 @@ def test_stale_stac_checksum_is_refreshed_from_odata(app_config, zipped_record):
     assert len(session.calls) == 2
 
 
+def test_existing_archive_with_stale_checksum_is_not_quarantined(app_config, zipped_record):
+    record, payload = zipped_record
+    record = replace(record, checksum="d50110" + "00" * 16)
+    store = CatalogueStore(app_config)
+    store.write_csv([record])
+    target = product_target(app_config, record)
+    target.parent.mkdir(parents=True)
+    target.write_bytes(payload)
+    session = StaleChecksumSession(payload)
+
+    result = download_products(
+        app_config,
+        [record],
+        store,
+        token_manager=NoAuth(),
+        session_factory=lambda: session,
+    )
+
+    saved = store.read()[0]
+    assert result.already_present == 1
+    assert result.downloaded == 0
+    assert target.is_file()
+    assert not list(target.parent.glob(f"{target.name}.invalid-*"))
+    assert saved.checksum == "d50110" + hashlib.md5(payload).hexdigest()
+    assert saved.checksum_verified is True
+    assert session.calls == [
+        f"{app_config.api.catalogue_odata_url}/Products({record.product_id})"
+    ]
+
+
 def test_dry_run_does_not_create_archive(app_config, product_record):
     store = CatalogueStore(app_config)
     store.write_csv([product_record])
