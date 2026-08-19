@@ -234,6 +234,20 @@ download again before considering a retry. The same refresh is performed before 
 existing final ZIP, preventing a valid archive from being renamed because of stale STAC metadata.
 A genuine mismatch against current OData metadata still fails normally.
 
+Versions before this safeguard may have left many `*.SAFE.zip.invalid-<timestamp>` files. Recover
+them in bulk with a preview-first utility:
+
+```bash
+scripts/recover_quarantined.sh
+scripts/recover_quarantined.sh --apply
+```
+
+The default makes no changes. With `--apply`, a quarantined ZIP is restored only when the final
+name is absent and the complete ZIP CRC test passes. If the final ZIP already exists, the
+quarantined copy is removed only when both files are byte-identical. Different, corrupt, or
+ambiguous files are retained and reported for manual review. Use `--directory PATH` when the
+archive root is not supplied through `S2L1C_DOWNLOAD_DIRECTORY`.
+
 If a matching extracted `.SAFE` directory already exists beside the expected ZIP, the downloader
 checks for `manifest.safe`, `MTD_MSIL1C.xml`, `GRANULE`, and JP2 imagery, records the product as
 `existing-safe`, and skips the download. The archive checksum cannot be reverified after the ZIP
