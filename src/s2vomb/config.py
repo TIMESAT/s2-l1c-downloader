@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from datetime import date
@@ -206,7 +207,12 @@ def _normalize_tile(value: str | None) -> str | None:
     return f"T{tile}"
 
 
-def load_config(path: str | Path, *, today: date | None = None) -> AppConfig:
+def load_config(
+    path: str | Path,
+    *,
+    today: date | None = None,
+    environment: Mapping[str, str] | None = None,
+) -> AppConfig:
     source = Path(path).expanduser().resolve()
     if not source.is_file():
         raise ConfigError(f"Configuration file does not exist: {source}")
@@ -296,6 +302,10 @@ def load_config(path: str | Path, *, today: date | None = None) -> AppConfig:
     )
 
     download = _mapping(root_data.get("download"), "download")
+    active_environment = os.environ if environment is None else environment
+    download_directory = active_environment.get("S2VOMB_DOWNLOAD_DIRECTORY", "").strip()
+    if not download_directory:
+        download_directory = download.get("directory")
     layout = _required_text(download, "layout", "download")
     if layout not in {"tile/year", "tile", "year"}:
         raise ConfigError("download.layout must be 'tile/year', 'tile', or 'year'")
@@ -306,7 +316,7 @@ def load_config(path: str | Path, *, today: date | None = None) -> AppConfig:
     if backoff < 0:
         raise ConfigError("download.backoff_seconds must be >= 0")
     download_config = DownloadConfig(
-        directory=_path(project_root, download.get("directory"), "download.directory"),
+        directory=_path(project_root, download_directory, "download.directory"),
         layout=layout,
         workers=_positive_int(download.get("workers", 2), "download.workers", maximum=8),
         retries=_positive_int(download.get("retries", 5), "download.retries", minimum=0),

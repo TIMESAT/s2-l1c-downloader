@@ -33,3 +33,14 @@ def test_invalid_cloud_threshold_is_rejected(app_config):
     )
     with pytest.raises(ConfigError, match="between 0 and 100"):
         load_config(app_config.source_path)
+
+
+def test_environment_overrides_download_directory(app_config, tmp_path):
+    archive = tmp_path / "shared" / "S2L1C"
+    config = load_config(
+        app_config.source_path,
+        environment={"S2VOMB_DOWNLOAD_DIRECTORY": str(archive)},
+    )
+
+    assert config.download.directory == archive
+    assert config.effective_dict()["download"]["directory"] == str(archive)

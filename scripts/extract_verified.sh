@@ -4,7 +4,7 @@ set -uo pipefail
 
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 repo_root=$(cd -- "${script_dir}/.." && pwd)
-archive_root="${repo_root}/data/raw/S2_L1C"
+archive_root="${S2VOMB_DOWNLOAD_DIRECTORY:-${repo_root}/data/raw/S2_L1C}"
 keep_zip=false
 dry_run=false
 

@@ -87,6 +87,17 @@ must be available for reauthentication. Use a shell prompt, operating-system key
 local secret manager rather than putting values in shell history. `.env.example` lists variable
 names only; `.env*` files are ignored, and the application intentionally does not auto-load them.
 
+Linux/HPC users can override the archive location without editing the tracked YAML:
+
+```bash
+export S2VOMB_DOWNLOAD_DIRECTORY=/projects/eko/fs7/pers/ZC/TWIN_water/S2L1C
+```
+
+This path overrides `download.directory` for both `s2vomb` and
+`scripts/extract_verified.sh`. The resolved absolute path is recorded in every effective
+configuration and manifest. It may be placed in the user's ignored `.env`, but that file must
+still be sourced before running commands.
+
 ## Vombsjön configuration
 
 [`config/vombsjon.yaml`](config/vombsjon.yaml) starts at 2017-01-01 and uses `end_date: null`, which
