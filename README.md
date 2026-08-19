@@ -113,7 +113,8 @@ sentinel:
   start_date: "2017-01-01"
   end_date: null
   platform: null                 # e.g. S2A or sentinel-2b
-  tile_id: T33UVB               # set null to use the search polygon instead
+  tile_id: T33UVB
+  require_full_processing_roi_coverage: true
   max_scene_cloud_cover: null    # leave null for the research archive
 ```
 
@@ -139,6 +140,13 @@ count, estimated size, years, and tile IDs. Refreshing the search preserves prio
 state for matching product UUIDs. Duplicate STAC pagination records are removed deterministically.
 `--max-items` exists for diagnostics only and is recorded in provenance; omit it for a publication
 catalogue.
+
+The example combines the `T33UVB` MGRS constraint with the actual STAC product footprint. The STAC
+query must intersect the Vombsjön lake + 5 km processing ROI, and a local deterministic geometry
+check then retains only products whose footprint fully contains that ROI. This removes partial
+swath products—including the R022 products that share the tile name but do not cover the lake—
+without assuming that relative orbit alone guarantees coverage. Existing files excluded from a
+refreshed catalogue are not deleted.
 
 ## Review storage requirements
 

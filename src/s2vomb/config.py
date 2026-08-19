@@ -32,6 +32,7 @@ class SentinelConfig:
     end_date_was_open: bool
     platform: str | None
     tile_id: str | None
+    require_full_processing_roi_coverage: bool
     max_scene_cloud_cover: float | None
 
 
@@ -267,6 +268,10 @@ def load_config(
         end_date_was_open=open_end,
         platform=_normalize_platform(_optional_text(sentinel.get("platform"), "sentinel.platform")),
         tile_id=_normalize_tile(_optional_text(sentinel.get("tile_id"), "sentinel.tile_id")),
+        require_full_processing_roi_coverage=_bool(
+            sentinel.get("require_full_processing_roi_coverage", False),
+            "sentinel.require_full_processing_roi_coverage",
+        ),
         max_scene_cloud_cover=cloud,
     )
 

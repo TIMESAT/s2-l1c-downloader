@@ -100,3 +100,121 @@ def load_geometry(path: str | Path, feature_id: str) -> GeometrySelection:
     name = str(properties.get("name") or feature_id)
     canonical = canonical_json(geometry)
     return GeometrySelection(source, feature_id, name, geometry, bbox, sha256_text(canonical))
+
+
+Point = tuple[float, float]
+Ring = list[Point]
+PolygonRings = list[Ring]
+
+
+def _polygon_rings(geometry: dict[str, Any]) -> list[PolygonRings]:
+    """Return Polygon/MultiPolygon coordinates as numeric rings."""
+    kind = geometry.get("type")
+    coordinates = geometry.get("coordinates")
+    if not isinstance(coordinates, list):
+        return []
+    polygons = [coordinates] if kind == "Polygon" else coordinates if kind == "MultiPolygon" else []
+    result: list[PolygonRings] = []
+    for polygon in polygons:
+        if not isinstance(polygon, list):
+            continue
+        rings: PolygonRings = []
+        for ring in polygon:
+            if not isinstance(ring, list):
+                continue
+            points = [
+                (float(position[0]), float(position[1]))
+                for position in ring
+                if isinstance(position, list)
+                and len(position) >= 2
+                and isinstance(position[0], (int, float))
+                and isinstance(position[1], (int, float))
+            ]
+            if len(points) >= 4 and points[0] == points[-1]:
+                rings.append(points)
+        if rings:
+            result.append(rings)
+    return result
+
+
+def _point_on_segment(point: Point, start: Point, end: Point, epsilon: float = 1e-10) -> bool:
+    cross = (point[0] - start[0]) * (end[1] - start[1]) - (
+        point[1] - start[1]
+    ) * (end[0] - start[0])
+    return abs(cross) <= epsilon and (
+        min(start[0], end[0]) - epsilon <= point[0] <= max(start[0], end[0]) + epsilon
+        and min(start[1], end[1]) - epsilon <= point[1] <= max(start[1], end[1]) + epsilon
+    )
+
+
+def _point_in_ring(point: Point, ring: Ring) -> tuple[bool, bool]:
+    """Return (inside, on_boundary) for a closed ring."""
+    inside = False
+    for start, end in zip(ring, ring[1:], strict=False):
+        if _point_on_segment(point, start, end):
+            return True, True
+        if (start[1] > point[1]) != (end[1] > point[1]):
+            crossing_x = (
+                (end[0] - start[0])
+                * (point[1] - start[1])
+                / (end[1] - start[1])
+                + start[0]
+            )
+            if point[0] < crossing_x:
+                inside = not inside
+    return inside, False
+
+
+def _point_in_polygon(point: Point, polygon: PolygonRings) -> bool:
+    in_exterior, on_exterior = _point_in_ring(point, polygon[0])
+    if not in_exterior and not on_exterior:
+        return False
+    for hole in polygon[1:]:
+        in_hole, on_hole = _point_in_ring(point, hole)
+        if in_hole and not on_hole:
+            return False
+    return True
+
+
+def _orientation(start: Point, end: Point, point: Point) -> float:
+    return (end[0] - start[0]) * (point[1] - start[1]) - (
+        end[1] - start[1]
+    ) * (point[0] - start[0])
+
+
+def _properly_crosses(a: Point, b: Point, c: Point, d: Point, epsilon: float = 1e-10) -> bool:
+    first = _orientation(a, b, c)
+    second = _orientation(a, b, d)
+    third = _orientation(c, d, a)
+    fourth = _orientation(c, d, b)
+    return (
+        (first > epsilon and second < -epsilon) or (first < -epsilon and second > epsilon)
+    ) and ((third > epsilon and fourth < -epsilon) or (third < -epsilon and fourth > epsilon))
+
+
+def _polygon_covers_ring(container: PolygonRings, target: Ring) -> bool:
+    sample_points = list(target[:-1])
+    sample_points.extend(
+        ((start[0] + end[0]) / 2, (start[1] + end[1]) / 2)
+        for start, end in zip(target, target[1:], strict=False)
+    )
+    if not all(_point_in_polygon(point, container) for point in sample_points):
+        return False
+    return not any(
+        _properly_crosses(start, end, boundary_start, boundary_end)
+        for start, end in zip(target, target[1:], strict=False)
+        for boundary in container
+        for boundary_start, boundary_end in zip(boundary, boundary[1:], strict=False)
+    )
+
+
+def geometry_covers(container: dict[str, Any], target: dict[str, Any]) -> bool:
+    """Return whether a footprint fully contains every target polygon."""
+    container_polygons = _polygon_rings(container)
+    target_polygons = _polygon_rings(target)
+    if not container_polygons or not target_polygons:
+        return False
+    return all(
+        any(_polygon_covers_ring(candidate, polygon[0]) for candidate in container_polygons)
+        for polygon in target_polygons
+    )

@@ -127,8 +127,16 @@ def _snapshot_catalogue(context: RunContext, records: list[ProductRecord]) -> No
 def _search(args: argparse.Namespace, config: AppConfig, context: RunContext) -> int:
     logger = configure_logging(context, verbose=args.verbose)
     search_geometry, roi = _load_geometries(config)
+    discovery_geometry = (
+        roi if config.sentinel.require_full_processing_roi_coverage else search_geometry
+    )
     logger.info("Searching CDSE STAC for %s", config.study_area.name)
-    result = STACClient(config).search(search_geometry, max_items=args.max_items)
+    result = STACClient(config).search(discovery_geometry, max_items=args.max_items)
+    if result.footprints_rejected:
+        logger.info(
+            "Excluded %s products without full processing-ROI footprint coverage",
+            len(result.footprints_rejected),
+        )
     store = CatalogueStore(config)
     records = store.merge_previous_state(result.records)
     paths = store.write_all(records, feature_collection=result.feature_collection)
@@ -150,6 +158,7 @@ def _search(args: argparse.Namespace, config: AppConfig, context: RunContext) ->
         catalogue={
             "products_discovered": len(records),
             "duplicates_removed": result.duplicates_removed,
+            "footprints_rejected_for_incomplete_roi_coverage": result.footprints_rejected,
             "pages_queried": result.pages,
             "max_items": args.max_items,
             "stac_request_body": result.request_body,
@@ -159,6 +168,9 @@ def _search(args: argparse.Namespace, config: AppConfig, context: RunContext) ->
             "feature_id": roi.feature_id,
             "geometry_sha256": roi.sha256,
             "used_to_crop_downloads": False,
+            "required_full_footprint_coverage": (
+                config.sentinel.require_full_processing_roi_coverage
+            ),
         },
         inventory_file=str(inventory_path),
     )
@@ -329,10 +341,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     context: RunContext | None = None
     try:
         config = load_config(args.config)
-        search_geometry = load_geometry(
-            config.study_area.geometry, config.study_area.search_feature
+        search_geometry, processing_roi = _load_geometries(config)
+        query_geometry = (
+            processing_roi
+            if config.sentinel.require_full_processing_roi_coverage
+            else search_geometry
         )
-        query_geometry = None if config.sentinel.tile_id else search_geometry
         context = begin_run(config, args.command, query_geometry)
         if args.command == "search":
             return _search(args, config, context)

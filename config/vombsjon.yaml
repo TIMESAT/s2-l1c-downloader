@@ -17,9 +17,11 @@ sentinel:
   # in every effective configuration and run manifest.
   end_date: null
   platform: null
-  # When set, discovery uses this complete MGRS tile and does not apply the
-  # search polygon. Set null to fall back to the configured search geometry.
+  # Keep the MGRS tile constraint, but also use the actual STAC footprint.
   tile_id: "T33UVB"
+  # Exclude partial-swath products unless their valid-data footprint fully
+  # contains the configured Vombsjön lake boundary + 5 km processing ROI.
+  require_full_processing_roi_coverage: true
   # Deliberately disabled by default. Tile cloud percentage is not a reliable
   # proxy for cloud over a small lake.
   max_scene_cloud_cover: null

@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from s2vomb.geometry import load_geometry
+from s2vomb.geometry import geometry_covers, load_geometry
 from s2vomb.utils import GeometryError
 
 
@@ -41,3 +41,21 @@ def test_rejects_unclosed_polygon(tmp_path):
     )
     with pytest.raises(GeometryError, match="not closed"):
         load_geometry(path, "bad")
+
+
+def test_geometry_covers_complete_roi_but_rejects_partial_swath():
+    roi = {
+        "type": "Polygon",
+        "coordinates": [[[13.4, 55.6], [13.8, 55.6], [13.8, 55.8], [13.4, 55.8], [13.4, 55.6]]],
+    }
+    complete = {
+        "type": "Polygon",
+        "coordinates": [[[13, 55], [15, 55], [15, 56], [13, 56], [13, 55]]],
+    }
+    partial = {
+        "type": "Polygon",
+        "coordinates": [[[13.6, 55], [15, 55], [15, 56], [13.6, 56], [13.6, 55]]],
+    }
+
+    assert geometry_covers(complete, roi)
+    assert not geometry_covers(partial, roi)

@@ -17,6 +17,7 @@ def test_example_configuration_resolves_open_end_date():
     assert config.sentinel.end_date == date(2026, 8, 17)
     assert config.sentinel.end_date_was_open is True
     assert config.sentinel.max_scene_cloud_cover is None
+    assert config.sentinel.require_full_processing_roi_coverage is True
     assert config.download.workers == 2
     assert config.download.layout == "tile"
     assert config.api.catalogue_odata_url == (

@@ -80,12 +80,24 @@ def begin_run(
         "query": {
             "collection": config.sentinel.collection,
             "processing_level": config.sentinel.processing_level,
-            "spatial_mode": "tile" if config.sentinel.tile_id else "geometry",
+            "spatial_mode": (
+                "tile+full-processing-roi"
+                if config.sentinel.tile_id
+                and config.sentinel.require_full_processing_roi_coverage
+                else "tile+intersects"
+                if config.sentinel.tile_id
+                else "full-processing-roi"
+                if config.sentinel.require_full_processing_roi_coverage
+                else "geometry-intersects"
+            ),
             "start_date": config.sentinel.start_date.isoformat(),
             "end_date": config.sentinel.end_date.isoformat(),
             "end_date_was_open": config.sentinel.end_date_was_open,
             "platform": config.sentinel.platform,
             "tile_id": config.sentinel.tile_id,
+            "require_full_processing_roi_coverage": (
+                config.sentinel.require_full_processing_roi_coverage
+            ),
             "max_scene_cloud_cover": config.sentinel.max_scene_cloud_cover,
         },
     }

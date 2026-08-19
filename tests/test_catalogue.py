@@ -58,7 +58,7 @@ def test_search_body_has_intersection_and_no_default_cloud_filter(app_config):
     assert "query" not in body
 
 
-def test_configured_tile_replaces_geometry_intersection(app_config):
+def test_configured_tile_is_combined_with_geometry_intersection(app_config):
     geometry = load_geometry(app_config.study_area.geometry, "search")
     tile_config = replace(
         app_config,
@@ -67,8 +67,40 @@ def test_configured_tile_replaces_geometry_intersection(app_config):
 
     body = build_search_body(tile_config, geometry)
 
-    assert "intersects" not in body
+    assert body["intersects"] == geometry.geometry
     assert body["query"]["grid:code"] == {"eq": "MGRS-33UVB"}
+
+
+def test_full_processing_roi_filter_rejects_partial_swath(app_config):
+    covering = make_stac_item()
+    missing = make_stac_item(
+        stac_id="S2B_MSIL1C_20240203T102431_N0510_R022_T33UVB_20240203T120000",
+        product_uuid="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+        acquired="2024-02-03T10:24:31Z",
+    )
+    missing["geometry"] = {
+        "type": "Polygon",
+        "coordinates": [[[14, 55], [15, 55], [15, 56], [14, 56], [14, 55]]],
+    }
+    session = FakeSession(
+        [{"type": "FeatureCollection", "features": [covering, missing], "links": []}]
+    )
+    geometry = load_geometry(app_config.study_area.geometry, "roi")
+    filtered_config = replace(
+        app_config,
+        sentinel=replace(
+            app_config.sentinel,
+            tile_id="T33UVB",
+            require_full_processing_roi_coverage=True,
+        ),
+    )
+
+    result = STACClient(filtered_config, session_factory=lambda: session).search(geometry)
+
+    assert [record.stac_id for record in result.records] == [covering["id"]]
+    assert result.footprints_rejected == [missing["id"]]
+    assert result.records[0].search_intersection.endswith("full-processing-roi")
+    assert result.request_body["intersects"] == geometry.geometry
 
 
 def test_stac_pagination_and_normalization(app_config):

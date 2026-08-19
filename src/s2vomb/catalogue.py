@@ -17,7 +17,7 @@ from urllib3.util.retry import Retry
 
 from . import __version__
 from .config import AppConfig
-from .geometry import GeometrySelection
+from .geometry import GeometrySelection, geometry_covers
 from .models import (
     CATALOGUE_FIELDS,
     ProductRecord,
@@ -34,6 +34,7 @@ class SearchResult:
     feature_collection: dict[str, Any]
     request_body: dict[str, Any]
     duplicates_removed: list[str]
+    footprints_rejected: list[str]
     pages: int
 
 
@@ -51,10 +52,9 @@ def build_search_body(config: AppConfig, geometry: GeometrySelection) -> dict[st
     query: dict[str, Any] = {}
     if sentinel.platform:
         query["platform"] = {"eq": sentinel.platform}
+    body["intersects"] = geometry.geometry
     if sentinel.tile_id:
         query["grid:code"] = {"eq": f"MGRS-{sentinel.tile_id.removeprefix('T')}"}
-    else:
-        body["intersects"] = geometry.geometry
     if sentinel.max_scene_cloud_cover is not None:
         query["eo:cloud_cover"] = {"lte": sentinel.max_scene_cloud_cover}
     if query:
@@ -161,12 +161,28 @@ class STACClient:
         finally:
             session.close()
 
+        footprints_rejected: list[str] = []
+        if self.config.sentinel.require_full_processing_roi_coverage:
+            retained: list[dict[str, Any]] = []
+            for item in features:
+                footprint = item.get("geometry") if isinstance(item.get("geometry"), dict) else {}
+                if geometry_covers(footprint, geometry.geometry):
+                    retained.append(item)
+                else:
+                    footprints_rejected.append(str(item.get("id", "")))
+            features = retained
+
         tile_search = self.config.sentinel.tile_id is not None
+        search_method = "stac-intersects"
+        if tile_search:
+            search_method = "stac-tile-intersects"
+        if self.config.sentinel.require_full_processing_roi_coverage:
+            search_method += "-full-processing-roi"
         normalized = [
             normalize_stac_item(
                 item,
-                "" if tile_search else geometry.sha256,
-                search_method="stac-tile-query" if tile_search else "stac-intersects",
+                geometry.sha256,
+                search_method=search_method,
             )
             for item in features
         ]
@@ -177,7 +193,7 @@ class STACClient:
             "numberReturned": len(features),
             "s2vomb:search": body,
         }
-        return SearchResult(records, collection, body, duplicates, pages)
+        return SearchResult(records, collection, body, duplicates, footprints_rejected, pages)
 
     def _validate_page_url(self, url: str) -> None:
         expected = urlparse(self.config.api.stac_search_url)
