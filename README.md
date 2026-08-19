@@ -1,13 +1,14 @@
-# Sentinel-2 L1C archive for Vombsjön
+# Sentinel-2 L1C lake archive downloader
 
-`s2vomb` discovers, catalogues, inventories, and bulk downloads complete Sentinel-2
-Level-1C source products for Vombsjön, Skåne, Sweden. Discovery uses the official
+`s2l1c` discovers, catalogues, inventories, and bulk downloads complete Sentinel-2
+Level-1C source products for configurable lake study areas. The supplied configuration targets
+Vombsjön, Skåne, Sweden; additional lakes use separate YAML and GeoJSON files. Discovery uses the official
 [Copernicus Data Space Ecosystem STAC API](https://documentation.dataspace.copernicus.eu/APIs/STAC.html),
 and complete products are retrieved through the official
 [CDSE OData download service](https://documentation.dataspace.copernicus.eu/APIs/OData.html#product-download).
 It does not scrape the CDSE web interface.
 
-The repository is designed for a Sentinel-2 × TIMESAT × chlorophyll-a study. Its archive is
+The repository originated in a Sentinel-2 × TIMESAT × chlorophyll-a study. Its archive is
 atmospheric-correction-neutral: downloads are preserved as original, complete L1C product ZIPs
 and can later feed ACOLITE-DSF, ESA SNAP/C2RCC/C2X, or direct top-of-atmosphere analyses.
 
@@ -15,9 +16,10 @@ and can later feed ACOLITE-DSF, ESA SNAP/C2RCC/C2X, or direct top-of-atmosphere 
 
 Vombsjön covers only a small part of a Sentinel-2 tile. Scene/tile-level cloud percentage can
 therefore be a poor proxy for conditions over the lake. The default configuration applies **no
-cloud threshold**. With the supplied configuration it catalogues every L1C product in the
-specified MGRS tile and records `eo:cloud_cover` for later review. An optional, permissive
-threshold can be configured, but ROI-specific cloud screening belongs in a downstream workflow.
+cloud threshold**. The supplied configuration combines its MGRS tile with actual product
+footprints and retains products that fully cover the processing ROI. It records `eo:cloud_cover`
+for later review. An optional, permissive threshold can be configured, but ROI-specific cloud
+screening belongs in a downstream workflow.
 
 Two spatial concepts are versioned in [`config/vombsjon.geojson`](config/vombsjon.geojson):
 
@@ -33,8 +35,8 @@ the exact geometry and its SHA-256 are captured in every run manifest.
 
 The workflow is deliberately staged:
 
-1. `search` sends the configured tile/date/filter query to the public CDSE STAC 1.1 API. If
-   `tile_id` is null, it falls back to the configured polygon.
+1. `search` sends the configured geometry/date/filter query to the public CDSE STAC 1.1 API and
+   optionally combines it with an MGRS tile and full-processing-ROI footprint requirement.
 2. STAC items are normalized to a chronological CSV catalogue; raw STAC JSON and optional
    Parquet are also retained.
 3. `inventory` reports product counts, temporal/platform/tile distributions, scene cloud
@@ -76,7 +78,7 @@ free [CDSE account](https://dataspace.copernicus.eu/) and an OAuth access token.
 uses the official `cdse-public` password grant and refreshes the returned access token in memory.
 It never writes credentials, access tokens, or refresh tokens to disk.
 
-Set these environment variables in the shell that launches `s2vomb`:
+Set these environment variables in the shell that launches `s2l1c`:
 
 - `CDSE_USERNAME`
 - `CDSE_PASSWORD`
@@ -90,13 +92,17 @@ names only; `.env*` files are ignored, and the application intentionally does no
 Linux/HPC users can override the archive location without editing the tracked YAML:
 
 ```bash
-export S2VOMB_DOWNLOAD_DIRECTORY=/projects/eko/fs7/pers/ZC/TWIN_water/S2L1C
+export S2L1C_DOWNLOAD_DIRECTORY=/projects/eko/fs7/pers/ZC/TWIN_water/S2L1C
 ```
 
-This path overrides `download.directory` for both `s2vomb` and
+This path overrides `download.directory` for both `s2l1c` and
 `scripts/extract_verified.sh`. The resolved absolute path is recorded in every effective
 configuration and manifest. It may be placed in the user's ignored `.env`, but that file must
 still be sourced before running commands.
+
+`s2vomb` remains installed as a compatibility alias for existing scripts, but new commands and
+documentation use `s2l1c`. The former `S2VOMB_DOWNLOAD_DIRECTORY` variable is also accepted as a
+deprecated alias; new configurations should use `S2L1C_DOWNLOAD_DIRECTORY`.
 
 ## Vombsjön configuration
 
@@ -125,7 +131,7 @@ also explicit. Credentials are never valid configuration keys.
 ## Search the catalogue
 
 ```bash
-s2vomb search --config config/vombsjon.yaml
+s2l1c search --config config/vombsjon.yaml
 ```
 
 This command downloads no imagery. It writes:
@@ -148,11 +154,17 @@ swath products—including the R022 products that share the tile name but do not
 without assuming that relative orbit alone guarantees coverage. Existing files excluded from a
 refreshed catalogue are not deleted.
 
+For another lake, keep the `s2l1c` command and create independent files such as
+`config/bolmen.yaml` and `config/bolmen.geojson`. Use separate catalogue and provenance
+directories so one study does not overwrite another. Start an unknown or multi-tile lake with
+`tile_id: null` and `require_full_processing_roi_coverage: false`, inventory the intersecting tile
+distribution, and then choose an appropriate single- or multi-tile archive strategy.
+
 ## Review storage requirements
 
 ```bash
-s2vomb inventory --config config/vombsjon.yaml
-s2vomb inventory --config config/vombsjon.yaml --year 2024
+s2l1c inventory --config config/vombsjon.yaml
+s2l1c inventory --config config/vombsjon.yaml --year 2024
 ```
 
 The human summary is accompanied by JSON containing products per year and month, platform and tile
@@ -164,13 +176,13 @@ whose size was not reported. Review this before committing storage to a multi-ye
 Start with an authentication-free dry run:
 
 ```bash
-s2vomb download --config config/vombsjon.yaml --year 2024 --dry-run
+s2l1c download --config config/vombsjon.yaml --year 2024 --dry-run
 ```
 
 An inclusive short date window can be selected without rebuilding the catalogue:
 
 ```bash
-s2vomb download --config config/vombsjon.yaml \
+s2l1c download --config config/vombsjon.yaml \
   --start-date 2026-08-01 --end-date 2026-08-15 --dry-run
 ```
 
@@ -178,7 +190,7 @@ For a small cross-year processor test, select the single scene in each year whos
 cloud metadata is nearest a target percentage:
 
 ```bash
-s2vomb download --config config/vombsjon.yaml --one-per-year-near-cloud 40 --dry-run
+s2l1c download --config config/vombsjon.yaml --one-per-year-near-cloud 40 --dry-run
 ```
 
 This is deterministic and records the target in the run manifest. It uses tile/scene cloud
@@ -187,14 +199,14 @@ metadata only; it is not ROI-specific cloud screening.
 It prints the exact targets without opening a network download. Then launch the real transfer:
 
 ```bash
-s2vomb download --config config/vombsjon.yaml --year 2024
+s2l1c download --config config/vombsjon.yaml --year 2024
 ```
 
 The command prints the selected inventory and asks for confirmation. For a reviewed,
 non-interactive job:
 
 ```bash
-s2vomb download --config config/vombsjon.yaml --year 2024 --yes
+s2l1c download --config config/vombsjon.yaml --year 2024 --yes
 ```
 
 Omit `--year` only after reviewing the full inventory. The default is two workers with five
@@ -283,7 +295,7 @@ manifest's resolved end date.
 The CDSE STAC `Product` asset is an `application/zip` file named
 `<Sentinel-product>.SAFE.zip`. It contains the complete SAFE product tree, including product,
 datastrip, granule, radiometric/geometric, and manifest metadata required by atmospheric
-correction. `s2vomb` stores this ZIP byte-for-byte and does not replace it with band-only files or a
+correction. `s2l1c` stores this ZIP byte-for-byte and does not replace it with band-only files or a
 custom format.
 
 - **ESA SNAP / C2RCC / C2X:** SNAP versions commonly open native Sentinel product ZIPs directly.

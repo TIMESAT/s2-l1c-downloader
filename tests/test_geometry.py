@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from s2vomb.geometry import geometry_covers, load_geometry
-from s2vomb.utils import GeometryError
+from s2l1c.geometry import geometry_covers, load_geometry
+from s2l1c.utils import GeometryError
 
 
 def test_loads_named_geometry_and_stable_hash(app_config):

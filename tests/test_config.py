@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from s2vomb.config import load_config
-from s2vomb.utils import ConfigError
+from s2l1c.config import load_config
+from s2l1c.utils import ConfigError
 
 
 def test_example_configuration_resolves_open_end_date():
@@ -40,8 +40,18 @@ def test_environment_overrides_download_directory(app_config, tmp_path):
     archive = tmp_path / "shared" / "S2L1C"
     config = load_config(
         app_config.source_path,
-        environment={"S2VOMB_DOWNLOAD_DIRECTORY": str(archive)},
+        environment={"S2L1C_DOWNLOAD_DIRECTORY": str(archive)},
     )
 
     assert config.download.directory == archive
     assert config.effective_dict()["download"]["directory"] == str(archive)
+
+
+def test_legacy_download_directory_environment_alias(app_config, tmp_path):
+    archive = tmp_path / "legacy" / "S2L1C"
+    config = load_config(
+        app_config.source_path,
+        environment={"S2VOMB_DOWNLOAD_DIRECTORY": str(archive)},
+    )
+
+    assert config.download.directory == archive

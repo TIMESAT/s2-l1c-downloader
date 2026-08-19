@@ -308,7 +308,10 @@ def load_config(
 
     download = _mapping(root_data.get("download"), "download")
     active_environment = os.environ if environment is None else environment
-    download_directory = active_environment.get("S2VOMB_DOWNLOAD_DIRECTORY", "").strip()
+    download_directory = active_environment.get("S2L1C_DOWNLOAD_DIRECTORY", "").strip()
+    if not download_directory:
+        # Backward-compatible alias for installations created before the generic rename.
+        download_directory = active_environment.get("S2VOMB_DOWNLOAD_DIRECTORY", "").strip()
     if not download_directory:
         download_directory = download.get("directory")
     layout = _required_text(download, "layout", "download")

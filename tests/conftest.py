@@ -8,8 +8,8 @@ from datetime import date
 
 import pytest
 
-from s2vomb.config import load_config
-from s2vomb.models import ProductRecord, normalize_stac_item
+from s2l1c.config import load_config
+from s2l1c.models import ProductRecord, normalize_stac_item
 
 
 @pytest.fixture

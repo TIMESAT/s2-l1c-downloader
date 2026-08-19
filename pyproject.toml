@@ -3,14 +3,14 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "s2vomb"
+name = "s2l1c"
 version = "0.1.0"
-description = "Reproducible discovery and bulk download of Sentinel-2 L1C products for Vombsjon"
+description = "Reproducible discovery and bulk download of Sentinel-2 L1C products for lake studies"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 authors = [{ name = "Zhanzhang Cai" }]
-keywords = ["sentinel-2", "copernicus", "remote-sensing", "vombsjon"]
+keywords = ["sentinel-2", "copernicus", "remote-sensing", "lakes"]
 classifiers = [
   "Development Status :: 4 - Beta",
   "Environment :: Console",
@@ -34,7 +34,8 @@ dev = [
 ]
 
 [project.scripts]
-s2vomb = "s2vomb.cli:main"
+s2l1c = "s2l1c.cli:main"
+s2vomb = "s2l1c.cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

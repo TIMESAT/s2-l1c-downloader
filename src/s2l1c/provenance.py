@@ -107,7 +107,7 @@ def begin_run(
 
 
 def configure_logging(context: RunContext, *, verbose: bool = False) -> logging.Logger:
-    logger = logging.getLogger("s2vomb")
+    logger = logging.getLogger("s2l1c")
     logger.setLevel(logging.DEBUG)
     logger.handlers.clear()
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(message)s")

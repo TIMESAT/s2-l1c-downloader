@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from s2vomb.catalogue import CatalogueStore
-from s2vomb.cli import main
+from s2l1c.catalogue import CatalogueStore
+from s2l1c.cli import main
 
 
 def test_year_dry_run_requires_no_credentials_or_download(app_config, product_record, capsys):

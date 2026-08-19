@@ -75,7 +75,7 @@ def _retrying_session(retries: int) -> requests.Session:
     )
     adapter = HTTPAdapter(max_retries=retry)
     session = requests.Session()
-    session.headers["User-Agent"] = f"s2vomb/{__version__}"
+    session.headers["User-Agent"] = f"s2l1c/{__version__}"
     session.mount("https://", adapter)
     return session
 
@@ -191,7 +191,7 @@ class STACClient:
             "type": "FeatureCollection",
             "features": features,
             "numberReturned": len(features),
-            "s2vomb:search": body,
+            "s2l1c:search": body,
         }
         return SearchResult(records, collection, body, duplicates, footprints_rejected, pages)
 
@@ -221,7 +221,7 @@ class CatalogueStore:
     def read(self) -> list[ProductRecord]:
         if not self.csv_path.is_file():
             raise CatalogueError(
-                f"Catalogue not found: {self.csv_path}. Run 's2vomb search --config ...' first."
+                f"Catalogue not found: {self.csv_path}. Run 's2l1c search --config ...' first."
             )
         try:
             with self.csv_path.open("r", encoding="utf-8", newline="") as stream:
@@ -267,7 +267,7 @@ class CatalogueStore:
             import pyarrow as pa
             import pyarrow.parquet as pq
         except ImportError:
-            return None, "pyarrow is not installed; install s2vomb[parquet]"
+            return None, "pyarrow is not installed; install s2l1c[parquet]"
         destination = self.config.catalogue.parquet_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         temporary = destination.with_name(f".{destination.name}.tmp")

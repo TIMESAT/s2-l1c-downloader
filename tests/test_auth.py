@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from s2vomb.auth import TokenManager
-from s2vomb.utils import AuthenticationError
+from s2l1c.auth import TokenManager
+from s2l1c.utils import AuthenticationError
 
 
 class TokenResponse:

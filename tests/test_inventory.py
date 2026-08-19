@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 
-from s2vomb.inventory import calculate_inventory, render_inventory
+from s2l1c.inventory import calculate_inventory, render_inventory
 
 
 def test_inventory_calculations(app_config, product_record):

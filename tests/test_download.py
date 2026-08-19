@@ -3,8 +3,8 @@ from __future__ import annotations
 import hashlib
 from dataclasses import replace
 
-from s2vomb.catalogue import CatalogueStore
-from s2vomb.download import (
+from s2l1c.catalogue import CatalogueStore
+from s2l1c.download import (
     download_products,
     product_safe_directory,
     product_target,

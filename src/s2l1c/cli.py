@@ -24,12 +24,12 @@ from .models import (
     select_one_per_year_near_cloud,
 )
 from .provenance import RunContext, begin_run, configure_logging
-from .utils import S2VombError, atomic_write_json, atomic_write_text
+from .utils import S2L1CError, atomic_write_json, atomic_write_text
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="s2vomb",
+        prog="s2l1c",
         description="Discover, inventory, and download complete Sentinel-2 L1C products from CDSE.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
@@ -198,7 +198,7 @@ def _inventory(args: argparse.Namespace, config: AppConfig, context: RunContext)
 
 def _confirm_download() -> bool:
     if not sys.stdin.isatty():
-        raise S2VombError("Non-interactive downloads require --yes after reviewing the inventory")
+        raise S2L1CError("Non-interactive downloads require --yes after reviewing the inventory")
     answer = input("Proceed with full-product downloads? [y/N] ").strip().lower()
     return answer in {"y", "yes"}
 
@@ -354,8 +354,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _inventory(args, config, context)
         if args.command == "download":
             return _download(args, config, context)
-        raise S2VombError(f"Unsupported command: {args.command}")
-    except (S2VombError, OSError, ValueError) as error:
+        raise S2L1CError(f"Unsupported command: {args.command}")
+    except (S2L1CError, OSError, ValueError) as error:
         if context is not None:
             context.finish(
                 status="failed",

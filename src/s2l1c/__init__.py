@@ -1,9 +1,9 @@
-"""Sentinel-2 L1C discovery and download tools for the Vombsjön archive."""
+"""Reusable Sentinel-2 L1C discovery and archive download tools."""
 
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("s2vomb")
+    __version__ = version("s2l1c")
 except PackageNotFoundError:  # pragma: no cover - source tree without installation
     __version__ = "0.1.0"
 

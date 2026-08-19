@@ -5,9 +5,9 @@ from datetime import date
 
 from conftest import make_stac_item
 
-from s2vomb.catalogue import CatalogueStore, STACClient, build_search_body
-from s2vomb.geometry import load_geometry
-from s2vomb.models import (
+from s2l1c.catalogue import CatalogueStore, STACClient, build_search_body
+from s2l1c.geometry import load_geometry
+from s2l1c.models import (
     deduplicate_records,
     filter_records_by_date,
     filter_records_by_year,

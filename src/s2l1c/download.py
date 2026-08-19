@@ -278,13 +278,13 @@ def _download_one(
     target.parent.mkdir(parents=True, exist_ok=True)
     partial = target.with_name(f"{target.name}.part")
     url = _download_url(config, record)
-    log = logging.getLogger("s2vomb")
+    log = logging.getLogger("s2l1c")
     latest_error = "download did not start"
     attempts_used = 0
     checksum_refreshed = False
     max_attempts = config.download.retries + 1
     session = session_factory()
-    session.headers["User-Agent"] = f"s2vomb/{__version__}"
+    session.headers["User-Agent"] = f"s2l1c/{__version__}"
     try:
         for attempt in range(1, max_attempts + 1):
             attempts_used = attempt
@@ -486,7 +486,7 @@ def download_products(
     token_manager: TokenManager | None = None,
     session_factory: Callable[[], requests.Session] = requests.Session,
 ) -> DownloadBatchResult:
-    log = logger or logging.getLogger("s2vomb")
+    log = logger or logging.getLogger("s2l1c")
     if dry_run:
         outcomes = [
             DownloadOutcome(
@@ -603,7 +603,7 @@ def download_products(
     )
     record_by_id = {record.product_id: record for record in records}
     with ThreadPoolExecutor(
-        max_workers=config.download.workers, thread_name_prefix="s2vomb"
+        max_workers=config.download.workers, thread_name_prefix="s2l1c"
     ) as pool:
         futures = {
             pool.submit(

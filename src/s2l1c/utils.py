@@ -10,27 +10,27 @@ from pathlib import Path
 from typing import Any
 
 
-class S2VombError(Exception):
+class S2L1CError(Exception):
     """Base class for expected, user-facing application failures."""
 
 
-class ConfigError(S2VombError):
+class ConfigError(S2L1CError):
     """Raised when configuration is missing, inconsistent, or unsafe."""
 
 
-class GeometryError(S2VombError):
+class GeometryError(S2L1CError):
     """Raised when a configured GeoJSON geometry cannot be used."""
 
 
-class CatalogueError(S2VombError):
+class CatalogueError(S2L1CError):
     """Raised when catalogue discovery or persistence fails."""
 
 
-class AuthenticationError(S2VombError):
+class AuthenticationError(S2L1CError):
     """Raised when secure CDSE authentication cannot be completed."""
 
 
-class DownloadError(S2VombError):
+class DownloadError(S2L1CError):
     """Raised when a source product cannot be downloaded or verified."""
 
 
