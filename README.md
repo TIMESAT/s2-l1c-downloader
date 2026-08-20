@@ -154,6 +154,18 @@ swath products—including the R022 products that share the tile name but do not
 without assuming that relative orbit alone guarantees coverage. Existing files excluded from a
 refreshed catalogue are not deleted.
 
+An independent Erken example is also included as [`config/erken.yaml`](config/erken.yaml) and
+[`config/erken.geojson`](config/erken.geojson). It uses `T34VCM`, requires each retained product
+footprint to contain the lake + 5 km ROI, and writes its catalogue and provenance under separate
+Erken subdirectories. The metric buffer was constructed in UTM zone 34N; downloads remain complete
+L1C product archives rather than ROI crops.
+
+```bash
+s2l1c search --config config/erken.yaml
+s2l1c inventory --config config/erken.yaml
+s2l1c download --config config/erken.yaml --dry-run
+```
+
 For another lake, keep the `s2l1c` command and create independent files such as
 `config/bolmen.yaml` and `config/bolmen.geojson`. Use separate catalogue and provenance
 directories so one study does not overwrite another. Start an unknown or multi-tile lake with

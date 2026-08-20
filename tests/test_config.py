@@ -26,6 +26,21 @@ def test_example_configuration_resolves_open_end_date():
     assert config.study_area.geometry == repository / "config/vombsjon.geojson"
 
 
+def test_erken_example_configuration_is_valid_and_isolated():
+    repository = Path(__file__).resolve().parents[1]
+    config = load_config(repository / "config/erken.yaml", today=date(2026, 8, 20))
+
+    assert config.study_area.name == "Erken"
+    assert config.study_area.geometry == repository / "config/erken.geojson"
+    assert config.study_area.search_feature == "erken-search"
+    assert config.study_area.processing_roi_feature == "erken-processing-roi-5km"
+    assert config.sentinel.tile_id == "T34VCM"
+    assert config.sentinel.require_full_processing_roi_coverage is True
+    assert config.download.directory == repository / "data/raw/erken/S2_L1C"
+    assert config.catalogue.directory == repository / "data/catalogue/erken"
+    assert config.provenance.directory == repository / "data/logs/erken/runs"
+
+
 def test_invalid_cloud_threshold_is_rejected(app_config):
     text = app_config.source_path.read_text(encoding="utf-8")
     app_config.source_path.write_text(

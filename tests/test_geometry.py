@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -59,3 +60,14 @@ def test_geometry_covers_complete_roi_but_rejects_partial_swath():
 
     assert geometry_covers(complete, roi)
     assert not geometry_covers(partial, roi)
+
+
+def test_erken_example_roi_contains_search_geometry():
+    repository = Path(__file__).resolve().parents[1]
+    geometry_path = repository / "config/erken.geojson"
+    search = load_geometry(geometry_path, "erken-search")
+    roi = load_geometry(geometry_path, "erken-processing-roi-5km")
+
+    assert search.bbox == (18.469922, 59.827092, 18.659227, 59.86222)
+    assert roi.bbox == (18.380777, 59.782354, 18.748406, 59.907034)
+    assert geometry_covers(roi.geometry, search.geometry)
